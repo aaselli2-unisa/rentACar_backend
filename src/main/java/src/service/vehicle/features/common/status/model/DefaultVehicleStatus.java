@@ -4,7 +4,7 @@ public enum DefaultVehicleStatus {
     AVAILABLE("Kullanılabilir"),
     IN_USE("Kullanımda"),
     MAINTENANCE("Bakımda"),
-    UNAVAILABLE("Kullanılamaz"),
+    UNAVAILABLE("Kullanıpamaz -- test"),
     BOOKED("Rezerve"),
     DELETED("Sistem Dışı");
 
