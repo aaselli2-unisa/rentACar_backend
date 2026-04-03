@@ -5,7 +5,7 @@ public enum DefaultDiscount {
     NONE(0),
     DEFAULT(5),
     PAIR5(20),
-    HOSGELDIN(10);
+    WELCOME(10);
 
     private final int percentage;
 
