@@ -5,9 +5,9 @@ import org.springframework.security.core.GrantedAuthority;
 
 public enum UserRole implements GrantedAuthority {
     ADMIN("Admin"),
-    EMPLOYEE("Çalışan"),
-    CUSTOMER("Müşteri"),
-    DEVELOPER("Geliştirici");
+    EMPLOYEE("Employee"),
+    CUSTOMER("Customer"),
+    DEVELOPER("Developer");
     private final String label;
 
     UserRole(String label) {

@@ -2,13 +2,13 @@ package src.service.vehicle.features.common.fuel.model;
 
 public enum DefaultFuelType {
 
-    PETROL("Benzin"),
-    DIESEL("Dizel"),
-    ELECTRIC("Elektrik"),
+    PETROL("Petrol"),
+    DIESEL("Diesel"),
+    ELECTRIC("Electric"),
     HYBRID("Hybrid"),
-    LPG("Lpg"),
-    GASOLINE_LPG("Benzin Lpg"),
-    NO_FUEL("Yakıt Yok");
+    LPG("LPG"),
+    GASOLINE_LPG("Gasoline LPG"),
+    NO_FUEL("No Fuel");
     private final String label;
 
     DefaultFuelType(String label) {

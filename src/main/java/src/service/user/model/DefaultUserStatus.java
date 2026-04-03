@@ -1,9 +1,9 @@
 package src.service.user.model;
 
 public enum DefaultUserStatus {
-    PENDING_VERIFYING("Onay Bekleniyor"),
-    VERIFIED("Onaylandı"),
-    BLOCKED("Engellendi");
+    PENDING_VERIFYING("Pending Verification"),
+    VERIFIED("Verified"),
+    BLOCKED("Blocked");
     private final String label;
 
     DefaultUserStatus(String label) {

@@ -2,11 +2,11 @@ package src.service.vehicle.features.car.segment.model;
 
 public enum DefaultCarSegment {
 
-    ECONOMIC("Ekonomik"),
-    BUSINESS("Ticari"),
+    ECONOMIC("Economic"),
+    BUSINESS("Business"),
     PREMIUM("Premium"),
     VAN("Van"),
-    SPORT("Spor");
+    SPORT("Sport");
 
     private final String label;
 

@@ -2,11 +2,11 @@ package src.service.vehicle.features.common.shift.model;
 
 public enum DefaultShiftType {
 
-    SEMI_AUTO("Yarı Otomatik"),
-    MANUAL("Manuel"),
-    AUTOMATIC("Otomatik"),
-    TRIPTONIC("Triptonik"),
-    NO_GEAR("Vites Yok");
+    SEMI_AUTO("Semi-Automatic"),
+    MANUAL("Manual"),
+    AUTOMATIC("Automatic"),
+    TRIPTONIC("Triptonic"),
+    NO_GEAR("No Gear");
     private final String label;
 
     DefaultShiftType(String label) {

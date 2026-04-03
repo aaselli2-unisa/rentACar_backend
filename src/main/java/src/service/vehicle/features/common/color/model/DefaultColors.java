@@ -2,15 +2,15 @@ package src.service.vehicle.features.common.color.model;
 
 public enum DefaultColors {
 
-    WHITE("Beyaz"),
+    WHITE("White"),
 
-    BLACK("Siyah"),
+    BLACK("Black"),
 
-    RED("Kırmızı"),
+    RED("Red"),
 
-    GREY("Gümüş̧"),
+    GREY("Grey"),
 
-    BLUE("Mavi");
+    BLUE("Blue");
     private final String label;
 
     DefaultColors(String label) {
