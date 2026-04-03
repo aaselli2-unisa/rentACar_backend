@@ -1,12 +1,12 @@
 package src.service.vehicle.features.common.status.model;
 
 public enum DefaultVehicleStatus {
-    AVAILABLE("Kullanılabilir"),
-    IN_USE("Kullanımda"),
-    MAINTENANCE("Bakımda"),
-    UNAVAILABLE("Kullanıpamaz -- test"),
-    BOOKED("Rezerve"),
-    DELETED("Sistem Dışı");
+    AVAILABLE("Available"),
+    IN_USE("In Use"),
+    MAINTENANCE("Maintenance"),
+    UNAVAILABLE("Unavailable"),
+    BOOKED("Booked"),
+    DELETED("Deleted");
 
     private final String label;
 
