@@ -18,7 +18,7 @@ public class ErrorResponse {
     private LocalDateTime timestamp = LocalDateTime.now();
     private List<String> details;
 
-    //bilgi: CUSTOM Exception Handler ile error response dönüyoruz.
+    // INFO: returning error response via CUSTOM Exception Handler.
     public ErrorResponse(NotFoundExceptionType notFoundExceptionType, List<String> details) {
         this.errorCode = notFoundExceptionType.getErrorCode();
         this.details = details;

@@ -11,10 +11,10 @@ import lombok.*;
 @NoArgsConstructor
 @Builder
 public class UpdatePaymentDetailsRequest {
-    @NotNull(message = "Id null geçilemez")
+    @NotNull(message = "Id cannot be null")
     private int id;
-    @NotNull(message = "tutar null geçilemez")
-    @Min(value = 0, message = "tutar 0'dan küçük olamaz")
+    @NotNull(message = "Amount cannot be null")
+    @Min(value = 0, message = "Amount cannot be less than 0")
     private double amount;
 
 }

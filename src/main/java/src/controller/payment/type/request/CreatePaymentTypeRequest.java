@@ -13,13 +13,13 @@ import src.service.payment.type.model.DefaultPaymentType;
 @AllArgsConstructor
 @NoArgsConstructor
 public class CreatePaymentTypeRequest {
-    @NotBlank(message = "Ödeme tipi boş geçilemez")
+    @NotBlank(message = "Payment type name cannot be blank")
     @Size(min = 2, max = 20)
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ\\s]+$", message = "Ödeme tipi sadece harflerden oluşmalıdır.")
+    @Pattern(regexp = "^[a-zA-Z\\s]+$", message = "Payment type must consist of letters only.")
     private String paymentTypeEntityName;
 
     @NotNull
-    @Pattern(regexp = "^[A-Z-_]+$", message = "Ödeme tipi sadece büyük harflerden ve boşluksuz olmalıdır.")
+    @Pattern(regexp = "^[A-Z-_]+$", message = "Payment type must consist of uppercase letters only, with no spaces.")
     private DefaultPaymentType paymentType;
 
     @NotNull

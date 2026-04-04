@@ -1,9 +1,9 @@
 package src.service.payment.type.model;
 
 public enum DefaultPaymentType {
-    CREDIT_CARD("Kredi Kartı"),
-    CASH("Ofiste Ödeme"),
-    BANK_MONEY_TRANSFER("Havale");
+    CREDIT_CARD("Credit Card"),
+    CASH("Pay at Office"),
+    BANK_MONEY_TRANSFER("Bank Transfer");
 
     private final String label;
 
@@ -11,7 +11,7 @@ public enum DefaultPaymentType {
         this.label = label;
     }
 
-    // Yeni eklenen method
+    // Newly added method
     public static DefaultPaymentType[] getAll() {
         return values();
     }

@@ -64,7 +64,7 @@ public class BrandRules implements BaseItemRules {
 
     @Override
     public void existsByNameAndIdNot(String name, int id) {
-        //Kendisi hariç başka bir isim ile aynı olup olmadığını kontrol etmek için
+        //Check if it is the same as another name excluding itself
         if (brandRepository.existsByNameIgnoreCaseAndIdNot(name, id)) {
             throw new AlreadyExistsException(BRAND_ALREADY_EXISTS);
         }

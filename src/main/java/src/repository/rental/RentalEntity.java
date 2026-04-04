@@ -32,7 +32,7 @@ public class RentalEntity extends BaseEntity {
     @JoinColumn(name = "car_id", nullable = false)
     private CarEntity carEntity;
 
-    @Column(name = "start_kilometer") //EndKilometer ve ReturnDate null bırakılmalıdır.
+    @Column(name = "start_kilometer") //EndKilometer and ReturnDate must be left null.
     private Integer startKilometer = null;
 
     @Column(name = "end_kilometer")

@@ -8,12 +8,12 @@ import lombok.RequiredArgsConstructor;
 public enum PaymentExceptionType {
 
 
-    PAYMENT_REJECTED(4000, "Ödeme Bankanız tarafından Reddedildi"),
-    CREDIT_CARD_INFORMATION_NOT_VERIFIED(4001, "Kredi Kartı Bilgileriniz Doğrulanmadı"),
-    EXPIRY_DATE_HAS_EXPIRED(4002, "Kredi Kartı Bilgileriniz Doğrulanamadı"),
-    PAYMENT_TYPE_IS_NOT_ACTIVE(4003, "Ödeme Tipi Aktif Değil"),
-    NOT_SUPPORTED_PAYMENT_TYPE(4004, "Desteklenmeyen Ödeme Türü"),
-    PAYMENT_ERROR(4005, "Ödeme Hatası");
+    PAYMENT_REJECTED(4000, "Payment was rejected by your bank"),
+    CREDIT_CARD_INFORMATION_NOT_VERIFIED(4001, "Your credit card information could not be verified"),
+    EXPIRY_DATE_HAS_EXPIRED(4002, "Your credit card information could not be validated"),
+    PAYMENT_TYPE_IS_NOT_ACTIVE(4003, "Payment type is not active"),
+    NOT_SUPPORTED_PAYMENT_TYPE(4004, "Unsupported payment type"),
+    PAYMENT_ERROR(4005, "Payment error");
     //------------------------------------------------------------------
     private final Integer errorCode;
     private final String message;

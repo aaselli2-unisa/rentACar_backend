@@ -191,9 +191,9 @@ public class CarServiceImpl implements CarService {
         List<CarResponse> carResponseList = mapToDTOList(cars);
         carResponseList.forEach(carDTO -> {
             boolean isMatched = rules.isDrivingLicenseTypeSuitable(carDTO.getId(), customerId);
-            // Eğer araç kullanıcının lisans tipine uygun değilse
-            // isLicenseTypeSuitable'ı false yap
-            // Buradaki amaç, bütün araçları getirmek fakat ehliyet uyuşmayan araçları işaretlemek.
+            // If the vehicle is not suitable for the user's license type
+            // set isLicenseTypeSuitable to false
+            // The goal here is to return all vehicles but mark those with incompatible license types.
             carDTO.setIsLicenseTypeSuitable(isMatched);
         });
         return carResponseList;
@@ -207,7 +207,7 @@ public class CarServiceImpl implements CarService {
     }
 
     public List<CarEntity> getCarEntityListByDrivingLicenseSuitable(List<CarEntity> carEntityList, Integer customerId) {
-        //Müşteri giriş yapmış ise ve sadece ehliyetinin yettiği araçları isterse müşterinin ehliyet tipi ile araçlar karşılaştırılıp filtreleniyor.
+        //If the customer is logged in and requests only vehicles matching their license, the cars are compared and filtered by the customer's license type.
         return carEntityList.stream().filter(car -> rules.isDrivingLicenseTypeSuitable(car.getId(), customerId)).toList();
     }
 
