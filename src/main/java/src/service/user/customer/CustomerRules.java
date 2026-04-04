@@ -70,7 +70,7 @@ public class CustomerRules implements BaseUserRules {
 
     public void checkRentalHistory(List<RentalEntity> rentalHistory) {
         if (rentalHistory.isEmpty()) {
-            throw new DataNotFoundException(RENTAL_DATA_NOT_FOUND);//list not found dönmedik çünkü message ı uygun değil.
+            throw new DataNotFoundException(RENTAL_DATA_NOT_FOUND);//did not throw list not found because the message is not appropriate.
         }
     }
 
@@ -115,7 +115,7 @@ public class CustomerRules implements BaseUserRules {
 
     @Override
     public void existsByEmailAddressAndIdNot(String emailAddress, int id) {
-        //Kendisi hariç başka bir email ile aynı olup olmadığını kontrol etmek için
+        //Check if it is the same as another email excluding itself
         if (customerRepository.existsByEmailAddressIgnoreCaseAndIdNot(emailAddress, id)) {
             throw new AlreadyExistsException(EMAIL_ADDRESS_ALREADY_EXISTS);
         }

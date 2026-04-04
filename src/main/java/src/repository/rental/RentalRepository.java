@@ -16,7 +16,7 @@ public interface RentalRepository extends JpaRepository<RentalEntity, Integer> {
 
     List<RentalEntity> findAllByRentalStatusEntity_Id(int statusId);
 
-    // Aktif ve çakışan rentalleri buluyoruz
+    // Find active and overlapping rentals
     @Query("SELECT r FROM RentalEntity r " +
             "WHERE r.isActive = true " +
             "AND ((r.startDate BETWEEN :startDate AND :endDate) OR (r.endDate BETWEEN :startDate AND :endDate) " +

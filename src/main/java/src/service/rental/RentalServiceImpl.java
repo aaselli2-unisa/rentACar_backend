@@ -52,7 +52,7 @@ public class RentalServiceImpl implements RentalService {
         ) {
             return convertToShowRentalResponse(showRentalRequest);
         }
-        throw new ValidationException(VALIDATION_EXCEPTION, "Araç bu tarihler arasında kiralanamaz");
+        throw new ValidationException(VALIDATION_EXCEPTION, "The vehicle cannot be rented between these dates");
     }
 
     @Transactional
@@ -75,7 +75,7 @@ public class RentalServiceImpl implements RentalService {
 
     @Override
     public RentalResponse returnCar(ReturnRentalRequest returnRentalRequest) {
-        // ceza işlemleri , indirim işlemleri iptali kontrol edilecek sonuçta da totalPrice güncelleme
+        // penalty operations, discount cancellations will be checked, and totalPrice will be updated
         rules.check(returnRentalRequest);
         RentalEntity rentalEntity = this.returnReqeustToEntity(returnRentalRequest);
         CarEntity carEntity = rentalEntity.getCarEntity();
@@ -180,7 +180,7 @@ public class RentalServiceImpl implements RentalService {
     }
 
     private ShowRentalResponse convertToShowRentalResponse(ShowRentalRequest showRentalRequest) {
-        // indirim işlemleri sonucu totalPrice hesaplama
+        // calculate totalPrice after discount operations
         return ShowRentalResponse.builder()
                 .amount(rules.calculateAmount(showRentalRequest))
                 .customerResponse(customerService.getById(showRentalRequest.getCustomerEntityId()))

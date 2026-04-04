@@ -15,31 +15,31 @@ import java.time.LocalDate;
 @Builder
 public class CreditCardInformation {
 
-    @NotNull(message = "kart numarası null olamaz")
-    @NotBlank(message = "kart numarası boş geçilemez")
-    @Size(min = 16, max = 16, message = "kart numarası 16 karakter olmalıdır.")
-    @Pattern(regexp = "^[0-9]+$", message = "kart numarası sadece rakamlardan olusmalır.")
+    @NotNull(message = "Card number cannot be null")
+    @NotBlank(message = "Card number cannot be blank")
+    @Size(min = 16, max = 16, message = "Card number must be 16 characters.")
+    @Pattern(regexp = "^[0-9]+$", message = "Card number must consist of digits only.")
     private String cardNumber;
 
-    @NotNull(message = "isim null olamaz")
-    @NotBlank(message = "isim boş geçilemez")
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ]+$", message = "isim/soyisim sadece harflerden oluşmalıdır.")
+    @NotNull(message = "Name cannot be null")
+    @NotBlank(message = "Name cannot be blank")
+    @Pattern(regexp = "^[a-zA-Z]+$", message = "Name/surname must consist of letters only.")
     @Size(min = 2, max = 20)
     private String cardOwnerName;
 
-    @NotNull(message = "soyisim null olamaz")
-    @NotBlank(message = "soyisim boş geçilemez")
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ]+$", message = "isim/soyisim sadece harflerden oluşmalıdır.")
+    @NotNull(message = "Surname cannot be null")
+    @NotBlank(message = "Surname cannot be blank")
+    @Pattern(regexp = "^[a-zA-Z]+$", message = "Name/surname must consist of letters only.")
     @Size(min = 2, max = 20)
     private String cardOwnerSurname;
 
-    @NotNull(message = "son kullanma tarihi null olamaz")
-    @NotBlank(message = "son kullanma tarihi boş geçilemez")
+    @NotNull(message = "Expiration date cannot be null")
+    @NotBlank(message = "Expiration date cannot be blank")
     private LocalDate expirationDate;
 
-    @NotNull(message = "cvc null olamaz")
-    @NotBlank(message = "cvc boş geçilemez")
-    @Size(min = 3, max = 3, message = "cvc 3 karakter olmalıdır.")
-    @Pattern(regexp = "^[0-9]+$", message = "cvc sadece rakamlardan olusmalır.")
+    @NotNull(message = "CVC cannot be null")
+    @NotBlank(message = "CVC cannot be blank")
+    @Size(min = 3, max = 3, message = "CVC must be 3 characters.")
+    @Pattern(regexp = "^[0-9]+$", message = "CVC must consist of digits only.")
     private String cvc;
 }

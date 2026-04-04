@@ -73,7 +73,7 @@ public class RentalRules implements BaseRules {
 
         PaymentDetailsEntity paymentDetailsEntity = rentalEntity.getPaymentDetailsEntity();
 
-        //TODO  calculate total final amount kısmında hata var. cezalı hesaplamayı yanlış yapıyor.
+        //TODO  there is a bug in the calculate total final amount section. penalty calculation is done incorrectly.
 
         paymentDetailsEntity.setAmount(
                 this.calculateReturnFinalAmount(returnRentalRequest
@@ -83,8 +83,8 @@ public class RentalRules implements BaseRules {
     }
 
     public void checkDrivingLicenseType(int carId, Integer customerId) {
-        //Giriş yapmadan araç listeleyebilmek için customerId null verilebilmelidir.
-        //CustomerId verilmiş ise ve beklenen ehliyet tipine uyuyorsa:
+        //customerId can be null to allow vehicle listing without logging in.
+        //If customerId is provided and matches the expected driving license type:
         if (!carRules.isDrivingLicenseTypeSuitable(carId, customerId)) {
             throw new NotSuitableException(DRIVING_LICENSE_TYPE_NOT_SUITABLE);
         }
@@ -113,8 +113,8 @@ public class RentalRules implements BaseRules {
     }
 
     public void checkDiscountCode(String discountCode) {
-        if (this.discountCodeIsNotNull(discountCode)) { //discountCode girilmiş mi
-            if (!this.discountService.getByDiscountCode(discountCode).isActive()) // varsa aktifmi değilmi diye bakıyor.
+        if (this.discountCodeIsNotNull(discountCode)) { //has a discountCode been entered
+            if (!this.discountService.getByDiscountCode(discountCode).isActive()) // checks if it is active or not.
             {
                 throw new ValidationException(VALIDATION_EXCEPTION);
             }
@@ -155,10 +155,10 @@ public class RentalRules implements BaseRules {
 
 
     private double calculateTotalPriceWithDiscount(double baseTotalPrice, int discountPercent) {
-        // Discount yüzdesini ondalık formata çevir
+        // Convert discount percentage to decimal format
         double discountPercentage = (double) discountPercent / 100.0;
 
-        // İndirimi uygula
+        // Apply the discount
         return baseTotalPrice - (baseTotalPrice * discountPercentage);
     }
 
@@ -168,14 +168,14 @@ public class RentalRules implements BaseRules {
 
         double baseTotalPrice = calculateTotalBasePrice(totalRentalDays, rentalEntity.getCarEntity().getRentalPrice());
 
-        if (returnRentalRequest.getReturnDate().isBefore(rentalEntity.getEndDate())) {//İlk if - zamanından erken getirirse indirim iptali.
+        if (returnRentalRequest.getReturnDate().isBefore(rentalEntity.getEndDate())) {//First if - if returned early, discount is cancelled.
             return baseTotalPrice;
 
-        } else if (returnRentalRequest.getReturnDate().isAfter(rentalEntity.getEndDate())) { ////İkinci if - zamanından sonra teslim edildiyse.
-            return baseTotalPrice + (calculateDelayDay(rentalEntity.getEndDate(), returnRentalRequest.getReturnDate()) * 100); //Gün başına 100 tl ceza ve indirim iptal.
+        } else if (returnRentalRequest.getReturnDate().isAfter(rentalEntity.getEndDate())) { ////Second if - if returned after the due date.
+            return baseTotalPrice + (calculateDelayDay(rentalEntity.getEndDate(), returnRentalRequest.getReturnDate()) * 100); //100 penalty per day and discount cancelled.
         }
 
-        return rentalEntity.getPaymentDetailsEntity().getAmount(); //zamanında getirirse
+        return rentalEntity.getPaymentDetailsEntity().getAmount(); //if returned on time
     }
 
     public double calculateAmount(ShowRentalRequest showRentalRequest) {
@@ -191,7 +191,7 @@ public class RentalRules implements BaseRules {
                             showRentalRequest.getDiscountCode()).getDiscountPercentage()
             );
         } else {
-            // Discount kodu yoksa, direkt kira ücretini kullan
+            // If no discount code, use the rental price directly
             return totalBasePrice;
         }
     }

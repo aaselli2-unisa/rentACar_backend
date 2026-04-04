@@ -18,29 +18,29 @@ public class UpdateRentalRequest {
     int id;
     @Min(1)
     @NotNull(message = "customer id cannot be null")
-    private int customerEntityId;//input olarak alınmayacak !!
+    private int customerEntityId;// not taken as input !!
     @Min(1)
     @NotNull(message = "car id cannot be null")
-    private int carEntityId;//input olarak alınmayacak !!
+    private int carEntityId;// not taken as input !!
 
 
     @Min(1)
     @NotNull(message = "payment details id cannot be null")
-    private int paymentDetailsEntityId; //input olarak alınmayacak !!
+    private int paymentDetailsEntityId; // not taken as input !!
 
     @NotNull(message = "start date cannot be null")
-    private LocalDate startDate;//input olarak alınmayacak !!
+    private LocalDate startDate;// not taken as input !!
 
     @NotNull(message = "end date cannot be null")
-    private LocalDate endDate;//input olarak alınmayacak !!
+    private LocalDate endDate;// not taken as input !!
 
-    private LocalDate returnDate;//input olarak alınmayacak !!
+    private LocalDate returnDate;// not taken as input !!
 
     private Integer startKilometer;
 
     private Integer endKilometer;
 
-    private Integer discountEntityId;//input olarak alınmayacak !!
+    private Integer discountEntityId;// not taken as input !!
 
     @NotNull
     private int rentalStatusId;

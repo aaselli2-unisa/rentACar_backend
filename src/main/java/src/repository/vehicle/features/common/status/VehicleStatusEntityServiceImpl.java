@@ -43,7 +43,7 @@ public class VehicleStatusEntityServiceImpl implements VehicleStatusEntityServic
     @Override
     public VehicleStatusEntity getById(int id) {
         return repository.findById(id).orElseThrow(
-                () -> new DataNotFoundException(VEHICLE_STATUS_NOT_FOUND, "Araç durumu bulunamadı."));
+                () -> new DataNotFoundException(VEHICLE_STATUS_NOT_FOUND, "Vehicle status not found."));
     }
 
     @Override
@@ -54,7 +54,7 @@ public class VehicleStatusEntityServiceImpl implements VehicleStatusEntityServic
     @Override
     public VehicleStatusEntity getByStatus(DefaultVehicleStatus status) {
         return repository.findByVehicleStatus(status)
-                .orElseThrow(() -> new DataNotFoundException(VEHICLE_STATUS_NOT_FOUND, "Araç durumu bulunamadı."));
+                .orElseThrow(() -> new DataNotFoundException(VEHICLE_STATUS_NOT_FOUND, "Vehicle status not found."));
     }
 
     @Override

@@ -89,7 +89,7 @@ public class AdminRules implements BaseUserRules {
 
     @Override
     public void existsByEmailAddressAndIdNot(String emailAddress, int id) {
-        //Kendisi hariç başka bir email ile aynı olup olmadığını kontrol etmek için
+        //Check if it is the same as another email excluding itself
         if (adminRepository.existsByEmailAddressIgnoreCaseAndIdNot(emailAddress, id)) {
             throw new AlreadyExistsException(EMAIL_ADDRESS_ALREADY_EXISTS);
         }

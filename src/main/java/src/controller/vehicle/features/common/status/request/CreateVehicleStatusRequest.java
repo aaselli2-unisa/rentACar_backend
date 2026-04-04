@@ -13,12 +13,12 @@ import src.service.vehicle.features.common.status.model.DefaultVehicleStatus;
 @NoArgsConstructor
 public class CreateVehicleStatusRequest {
 
-    @NotBlank(message = "Araç durumu ismi boş geçilemez")
-    @Size(min = 2, message = "Araç durumu ismi en az 2 karakter olmalıdır.")
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ\\s]+$", message = "Araç durumu ismi sadece harflerden ve boşluklardan oluşmalıdır.")
+    @NotBlank(message = "Vehicle status name cannot be blank")
+    @Size(min = 2, message = "Vehicle status name must be at least 2 characters.")
+    @Pattern(regexp = "^[a-zA-Z\\s]+$", message = "Vehicle status name must consist of letters and spaces only.")
     String name;
 
-    @Pattern(regexp = "^[A-Z-_]+$", message = "Araç durumu tipi sadece büyük harflerden ve boşluksuz olmalıdır.")
+    @Pattern(regexp = "^[A-Z-_]+$", message = "Vehicle status type must consist of uppercase letters only, with no spaces.")
     DefaultVehicleStatus vehicleStatus;
 
 }

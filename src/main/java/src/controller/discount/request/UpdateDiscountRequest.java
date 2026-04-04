@@ -14,7 +14,7 @@ import lombok.*;
 public class UpdateDiscountRequest {
 
 
-    @NotNull(message = "id null olamaz")
+    @NotNull(message = "ID cannot be null")
     int id;
 
     @Pattern(regexp = "^[a-zA-Z0-9]+$", message = "Discount code must consist of letters and numbers only")

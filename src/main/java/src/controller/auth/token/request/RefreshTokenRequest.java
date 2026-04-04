@@ -10,10 +10,10 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 public class RefreshTokenRequest {
-    @Email//-> Email alırken @gmail @hotmail gibi kullanımları denetler.
-    @NotBlank(message = "Mail adresi boş geçilemez")
+    @Email//-> Validates email format (e.g. @gmail, @hotmail).
+    @NotBlank(message = "Email address cannot be blank")
     private String email;
-    @NotBlank(message = "token boş geçilemez")
+    @NotBlank(message = "Token cannot be blank")
     private String token;
 
 }

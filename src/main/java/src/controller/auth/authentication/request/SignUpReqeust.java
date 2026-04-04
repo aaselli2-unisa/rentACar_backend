@@ -19,22 +19,22 @@ public class SignUpReqeust {
     @Size(min = 2, max = 20)
     String name;
 
-    @NotBlank(message = "Soyisim boş geçilemez")
+    @NotBlank(message = "Surname cannot be blank")
     @Size(min = 2, max = 20)
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ]+$", message = "isim/soyisim sadece harflerden oluşmalıdır.")
+    @Pattern(regexp = "^[a-zA-Z]+$", message = "Name/surname must consist of letters only.")
     String surname;
 
-    @Email//-> Email alırken @gmail @hotmail gibi kullanımları denetler.
-    @NotBlank(message = "Mail adresi boş geçilemez")
+    @Email//-> Validates email format (e.g. @gmail, @hotmail).
+    @NotBlank(message = "Email address cannot be blank")
     String emailAddress;
 
     @Size(min = 8, max = 30)
-    @NotBlank(message = "Şifre boş geçilemez")
+    @NotBlank(message = "Password cannot be blank")
     String password;
 
-    @NotBlank(message = "telefon numarası boş geçilemez")
-    @Size(min = 10, max = 10, message = "Telefon numarası 10 hane olmalıdır.")
-    @Pattern(regexp = "^[0-9]+$", message = "Telefon numarası sadece sayılardan oluşmalıdır.")
+    @NotBlank(message = "Phone number cannot be blank")
+    @Size(min = 10, max = 10, message = "Phone number must be 10 digits.")
+    @Pattern(regexp = "^[0-9]+$", message = "Phone number must consist of digits only.")
     String phoneNumber;
 
     Double salary;

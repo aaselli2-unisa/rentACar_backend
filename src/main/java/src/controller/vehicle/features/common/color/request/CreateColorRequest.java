@@ -12,8 +12,8 @@ import lombok.*;
 @NoArgsConstructor
 public class CreateColorRequest {
 
-    @NotBlank(message = "Renk adı boş geçilemez")
-    @Size(min = 2, message = "Renk en az 2 karakter olmalıdır.")
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ]+$", message = "renk sadece harflerden oluşmalıdır.")
+    @NotBlank(message = "Color name cannot be blank")
+    @Size(min = 2, message = "Color name must be at least 2 characters.")
+    @Pattern(regexp = "^[a-zA-Z]+$", message = "Color name must consist of letters only.")
     String colorEntityName;
 }
