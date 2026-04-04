@@ -75,7 +75,7 @@ public class CarModelRules implements BaseItemRules {
     }
 
     public void checkBrand(int brandId) {
-        this.brandEntityService.getById(brandId); //Eğer db de böyle bir brand yok ise brandEntityManager ile hatayı fırlatacak.
+        this.brandEntityService.getById(brandId); //If such a brand does not exist in the db, brandEntityManager will throw the error.
     }
 
 }

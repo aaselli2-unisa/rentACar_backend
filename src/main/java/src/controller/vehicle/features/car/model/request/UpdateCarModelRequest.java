@@ -12,14 +12,14 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateCarModelRequest {
-    @NotNull(message = "id null olamaz")
+    @NotNull(message = "ID cannot be null")
     int carModelEntityId;
 
-    @NotBlank(message = "Model adı boş geçilemez")
-    @Size(min = 2, message = "Model en az 2 karakter olmalıdır.")
+    @NotBlank(message = "Model name cannot be blank")
+    @Size(min = 2, message = "Model name must be at least 2 characters.")
     String carModelEntityName;
 
-    @NotNull(message = "Marka null olamaz")
+    @NotNull(message = "Brand cannot be null")
     int brandEntityId;
 
 

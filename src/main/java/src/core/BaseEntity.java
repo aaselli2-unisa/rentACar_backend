@@ -12,7 +12,7 @@ import java.time.temporal.ChronoUnit;
 
 @Getter
 @Setter
-@MappedSuperclass //Alt klasların database tablosuna buradaki kolonları eklemek için kullanılır.
+@MappedSuperclass // Used to add these columns to the database table of subclasses.
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor

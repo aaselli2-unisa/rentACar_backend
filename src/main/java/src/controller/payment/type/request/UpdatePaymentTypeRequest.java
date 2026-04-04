@@ -16,7 +16,7 @@ public class UpdatePaymentTypeRequest {
 
 
     @Size(min = 2, max = 20)
-    @Pattern(regexp = "^[\sa-zA-ZğüşıöçĞÜŞİÖÇ]+$", message = "Ödeme tipi sadece harflerden oluşmalıdır.")
+    @Pattern(regexp = "^[\sa-zA-Z]+$", message = "Payment type must consist of letters only.")
     private String name;
 
     @NotNull

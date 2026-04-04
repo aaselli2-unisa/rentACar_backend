@@ -12,12 +12,12 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UpdateShiftTypeRequest {
-    @NotNull(message = "id null olamaz")
+    @NotNull(message = "ID cannot be null")
     int id;
 
-    @NotBlank(message = "Vites ismi boş geçilemez")
-    @Size(min = 2, message = "Vites ismi en az 2 karakter olmalıdır.")
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ\\s]+$", message = "Vites ismi sadece harflerden ve boşluklardan oluşmalıdır.")
+    @NotBlank(message = "Shift type name cannot be blank")
+    @Size(min = 2, message = "Shift type name must be at least 2 characters.")
+    @Pattern(regexp = "^[a-zA-Z\\s]+$", message = "Shift type name must consist of letters and spaces only.")
     String name;
 
 }

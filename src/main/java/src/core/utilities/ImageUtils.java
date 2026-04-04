@@ -16,39 +16,39 @@ import java.util.zip.Inflater;
 public class ImageUtils {
 
     /**
-     * Verilen byte dizisini sıkıştırır.
+     * Compresses the given byte array.
      *
-     * @param data Sıkıştırılacak byte dizisi
-     * @return Sıkıştırılmış byte dizisi
+     * @param data The byte array to compress
+     * @return The compressed byte array
      */
     public static byte[] compressImage(byte[] data) {
-        // Sıkıştırma için Deflater sınıfını kullan
+        // Use the Deflater class for compression
         Deflater deflater = new Deflater();
         deflater.setLevel(Deflater.BEST_COMPRESSION);
         deflater.setInput(data);
         deflater.finish();
 
-        // Sıkıştırılmış veriyi tutacak bir ByteArrayOutputStream oluştur
+        // Create a ByteArrayOutputStream to hold the compressed data
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream(data.length);
         byte[] tmp = new byte[4 * 1024];
         while (!deflater.finished()) {
-            // Sıkıştırılmış veriyi tampona yaz
+            // Write the compressed data to the buffer
             int size = deflater.deflate(tmp);
             outputStream.write(tmp, 0, size);
         }
         try {
             outputStream.close();
         } catch (IOException ignored) {
-            // Kapatma hatası yok sayılır
+            // Close error is ignored
         }
         return outputStream.toByteArray();
     }
 
     /**
-     * Verilen byte dizisini açar (sıkıştırmadan kurtarır).
+     * Decompresses the given byte array.
      *
-     * @param data Açılacak byte dizisi
-     * @return Açılmış byte dizisi
+     * @param data The byte array to decompress
+     * @return The decompressed byte array
      */
     public static byte[] decompressImage(byte[] data) {
         Inflater inflater = new Inflater();
@@ -64,7 +64,7 @@ public class ImageUtils {
 
             return outputStream.toByteArray();
         } catch (IOException | DataFormatException e) {
-            e.printStackTrace(); // Hata durumunda loglama
+            e.printStackTrace(); // Logging on error
             return null;
         } finally {
             inflater.end();
@@ -73,38 +73,38 @@ public class ImageUtils {
 
 
     /**
-     * Verilen byte dizisindeki görüntüyü belirtilen boyuta yeniden boyutlandırır.
+     * Resizes the image in the given byte array to the specified dimensions.
      *
-     * @param data      Yeniden boyutlandırılacak görüntünün byte dizisi
-     * @param newWidth  Yeni genişlik
-     * @param newHeight Yeni yükseklik
+     * @param data      The byte array of the image to resize
+     * @param newWidth  New width
+     * @param newHeight New height
      */
     public static byte[] resizeImage(byte[] data, int newWidth, int newHeight) throws IOException {
-        // Orijinal görüntüyü decompress eder
+        // Decompress the original image
         byte[] decompressedData = decompressImage(compressImage(data));
 
-        // Decompress edilmiş veriyi BufferedImage'a dönüştürür(bunu anlatacağım)
+        // Convert the decompressed data to a BufferedImage
         assert decompressedData != null;
         BufferedImage originalImage = ImageIO.read(new ByteArrayInputStream(decompressedData));
 
-        // Belirtilen boyutta yeni bir BufferedImage oluşturur
+        // Create a new BufferedImage with the specified dimensions
         BufferedImage resizedImage = new BufferedImage(newWidth, newHeight, originalImage.getType());
 
-        // Orijinal görüntüyü belirtilen boyutta yeni görüntüye çizer
+        // Draw the original image into the new image at the specified size
         Graphics2D g = resizedImage.createGraphics();
         g.drawImage(originalImage, 0, 0, newWidth, newHeight, null);
         g.dispose();
 
-        // Yeniden boyutlandırılmış görüntüyü sıkıştırır ve sonucu döndürür
+        // Compress the resized image and return the result
         return compressImage(imageToByteArray(resizedImage));
     }
 
     /**
-     * BufferedImage'ı byte dizisine dönüştürür.
+     * Converts a BufferedImage to a byte array.
      *
-     * @param image Dönüştürülecek BufferedImage
-     * @return Byte dizisine dönüştürülmüş BufferedImage
-     * @throws IOException Dönüştürme hatası durumunda fırlatılır
+     * @param image The BufferedImage to convert
+     * @return The BufferedImage converted to a byte array
+     * @throws IOException Thrown in case of a conversion error
      */
     private static byte[] imageToByteArray(BufferedImage image) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();

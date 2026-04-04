@@ -10,9 +10,9 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 public class SignInRequest {
-    @Email//-> Email alırken @gmail @hotmail gibi kullanımları denetler.
-    @NotBlank(message = "Mail adresi boş geçilemez")
+    @Email//-> Validates email format (e.g. @gmail, @hotmail).
+    @NotBlank(message = "Email address cannot be blank")
     private String email;
-    @NotBlank(message = "Şifre boş geçilemez")
+    @NotBlank(message = "Password cannot be blank")
     private String password;
 }

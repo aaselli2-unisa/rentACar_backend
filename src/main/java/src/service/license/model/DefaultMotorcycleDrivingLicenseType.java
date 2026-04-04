@@ -3,12 +3,12 @@ package src.service.license.model;
 public enum DefaultMotorcycleDrivingLicenseType {
 
     //-----------Motorcycles----------
-    NONE("Yok"),   //Yok
-    M("Motorlu Bisiklet"),   //Motorlu Bisiklet
-    A1("125 cc'ye kadar Motosiklet"),  //125 cc'ye kadar Motosiklet
-    A2("35 kw yi geçmeyen Motosiklet"),  //35 kw yi geçmeyen Motosiklet
-    A("35 kw yi geçen Motosiklet"),   //35 kw yi geçen Motosiklet
-    B1("4 tekerli Motosiklet");  //4 tekerli Motosiklet
+    NONE("None"),   //None
+    M("Motorized bicycle"),   //Motorized bicycle
+    A1("Motorcycle up to 125 cc"),  //Motorcycle up to 125 cc
+    A2("Motorcycle not exceeding 35 kw"),  //Motorcycle not exceeding 35 kw
+    A("Motorcycle exceeding 35 kw"),   //Motorcycle exceeding 35 kw
+    B1("4-wheeled motorcycle");  //4-wheeled motorcycle
 
     private final String label;
 

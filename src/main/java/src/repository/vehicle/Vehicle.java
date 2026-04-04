@@ -19,7 +19,7 @@ import src.service.vehicle.model.VehicleType;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-@MappedSuperclass //Alt klasların database tablosuna buradaki kolonları eklemek için kullanılır.
+@MappedSuperclass // Used to add these columns to the database table of subclasses.
 @SuperBuilder(builderMethodName = "vehicleBuilder")
 public class Vehicle extends BaseEntity {
 
@@ -59,7 +59,7 @@ public class Vehicle extends BaseEntity {
 
     @ManyToOne
     @JoinColumn(name = "expected_min_driving_license_type_id")
-    private DrivingLicenseTypeEntity expectedMinDrivingLicenseType; //-> kullanıcıdan beklenen minimum ehliyet sınıfı.
+    private DrivingLicenseTypeEntity expectedMinDrivingLicenseType; //-> The minimum driving license class expected from the user.
 
     @Column(name = "vehicle_type")
     @Enumerated(EnumType.STRING)

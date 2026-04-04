@@ -12,11 +12,11 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UpdateCarBodyTypeRequest {
-    @NotNull(message = "id null olamaz")
+    @NotNull(message = "ID cannot be null")
     int id;
-    @NotBlank(message = "Body Type adı boş geçilemez")
-    @Size(min = 2, message = "Body Type en az 2 karakter olmalıdır.")
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ]+$", message = "Body Type sadece harflerden oluşmalıdır.")
+    @NotBlank(message = "Body type name cannot be blank")
+    @Size(min = 2, message = "Body type name must be at least 2 characters.")
+    @Pattern(regexp = "^[a-zA-Z]+$", message = "Body type name must consist of letters only.")
     String name;
 
 
