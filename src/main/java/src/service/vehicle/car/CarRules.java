@@ -109,7 +109,7 @@ public class CarRules implements BaseRules {
 
             return customerLicenseLevel >= expectedLicenseLevel;
         }
-        return true; // Giriş yapmadan araç listeleyebilmek için customerId null verilebilmelidir.
+        return true; // customerId can be null to allow vehicle listing without logging in.
     }
 
     @Override
@@ -154,10 +154,10 @@ public class CarRules implements BaseRules {
     private void checkTotalRentalDays(LocalDate startDate, LocalDate endDate) {
         if (endDate != null) {
             if (startDate.isAfter(endDate)) {
-                throw new ValidationException(VALIDATION_EXCEPTION, "Başlangıç tarihi teslim tarihinden sonra olamaz");
+                throw new ValidationException(VALIDATION_EXCEPTION, "Start date cannot be after the return date");
             } else if ((int) ChronoUnit.DAYS.between(startDate, endDate) > 25) {
                 throw new ValidationException(VALIDATION_EXCEPTION,
-                        "Kiralama aralığı maksimum 25 gün olabilir. Lütfen tarih aralığınızı buna göre düzenleyiniz.");
+                        "The rental period can be a maximum of 25 days. Please adjust your date range accordingly.");
             }
         }
     }

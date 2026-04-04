@@ -65,7 +65,7 @@ public class EmployeeRules implements BaseUserRules {
 
     public void checkSalary(double salary) {
         if (salary <= 0) {
-            throw new ValidationException(VALIDATION_EXCEPTION, "Maaş en 0 dan büyük olmalıdır.");
+            throw new ValidationException(VALIDATION_EXCEPTION, "Salary must be greater than 0.");
         }
     }
 
@@ -83,7 +83,7 @@ public class EmployeeRules implements BaseUserRules {
 
     @Override
     public void existsByEmailAddressAndIdNot(String emailAddress, int id) {
-        //Kendisi hariç başka bir email ile aynı olup olmadığını kontrol etmek için
+        //Check if it is the same as another email excluding itself
         if (employeeRepository.existsByEmailAddressIgnoreCaseAndIdNot(emailAddress, id)) {
             throw new AlreadyExistsException(EMAIL_ADDRESS_ALREADY_EXISTS);
         }

@@ -26,7 +26,7 @@ public class SwaggerConfig {
                         ("Bearer Authentication", createAPIKeyScheme()))
                 .info(new Info().title("ExtendRent API")
                         .description("welcome to ExtendRent API")
-                        .version("1.0").contact(new Contact().name("Gökhan Asiltürk")
+                        .version("1.0").contact(new Contact().name("James Carter")
                                 .email("gokhanasilturkk@gmail.com").url("gokhanasilturkk@gmail.com")));
     }
 

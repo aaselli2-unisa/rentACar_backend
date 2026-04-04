@@ -4,7 +4,7 @@ import static src.controller.AnsiColorConstant.*;
 
 public final class LogConstant {
 
-    // Log Mesajları
+    // Log Messages
     public static final String CREATING_NEW_FUEL_TYPE = ANSI_BLUE + "Creating a new fuel type: " + ANSI_RESET + "{}";
     public static final String FUEL_TYPE_SUCCESSFULLY_CREATED = ANSI_GREEN + "Fuel type successfully created " + ANSI_RESET;
     public static final String UPDATING_FUEL_TYPE = ANSI_BLUE + "Updating fuel type: " + ANSI_RESET + "{}";

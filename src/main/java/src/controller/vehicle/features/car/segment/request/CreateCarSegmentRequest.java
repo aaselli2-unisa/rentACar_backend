@@ -11,8 +11,8 @@ import lombok.*;
 @NoArgsConstructor
 public class CreateCarSegmentRequest {
 
-    @NotBlank(message = "Segment adı boş geçilemez")
-    @Size(min = 2, message = "Segment en az 2 karakter olmalıdır.")
+    @NotBlank(message = "Segment name cannot be blank")
+    @Size(min = 2, message = "Segment name must be at least 2 characters.")
     String name;
 
 

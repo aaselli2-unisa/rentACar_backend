@@ -11,11 +11,11 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UpdateCarSegmentRequest {
-    @NotNull(message = "id null olamaz")
+    @NotNull(message = "ID cannot be null")
     int id;
 
-    @NotBlank(message = "Segment adı boş geçilemez")
-    @Size(min = 2, message = "Segment en az 2 karakter olmalıdır.")
+    @NotBlank(message = "Segment name cannot be blank")
+    @Size(min = 2, message = "Segment name must be at least 2 characters.")
     String name;
 
 

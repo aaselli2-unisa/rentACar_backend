@@ -12,9 +12,9 @@ import lombok.*;
 @NoArgsConstructor
 public class CreateFuelTypeRequest {
 
-    @NotBlank(message = "Yakıt ismi boş geçilemez")
-    @Size(min = 2, message = "Yakıt ismi en az 2 karakter olmalıdır.")
-    @Pattern(regexp = "^[a-zA-Z ]+$", message = "yakıt ismi sadece harflerden ve boşluklardan oluşmalıdır.")
+    @NotBlank(message = "Fuel type name cannot be blank")
+    @Size(min = 2, message = "Fuel type name must be at least 2 characters.")
+    @Pattern(regexp = "^[a-zA-Z ]+$", message = "Fuel type name must consist of letters and spaces only.")
     String name;
 
 }

@@ -54,7 +54,7 @@ public class CustomAuthenticationServiceImpl implements AuthenticationService, A
             String token = jwtService.generateToken(userEntity);
             return JwtToken.builder().token(token).build();
         }
-        throw new RuntimeException("Bilgiler hatalı");
+        throw new RuntimeException("Invalid credentials");
     }
 
     @Override
@@ -64,7 +64,7 @@ public class CustomAuthenticationServiceImpl implements AuthenticationService, A
             String newAccessToken = jwtService.generateToken(userEntity);
             return JwtToken.builder().token(newAccessToken).build();
         }
-        throw new RuntimeException("Bilgiler hatalı");
+        throw new RuntimeException("Invalid credentials");
     }
 
     @Override
