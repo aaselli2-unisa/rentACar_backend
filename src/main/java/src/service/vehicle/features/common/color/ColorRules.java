@@ -59,7 +59,7 @@ public class ColorRules implements BaseItemRules {
 
     @Override
     public void existsByNameAndIdNot(String name, int id) {
-        //Kendisi hariç başka bir rengin ismi ile aynı olup olmadığını kontrol etmek için
+        //Check if it is the same as another color's name excluding itself
         if (colorRepository.existsByNameIgnoreCaseAndIdNot(name, id)) {
             throw new AlreadyExistsException(COLOR_ALREADY_EXISTS);
         }

@@ -13,11 +13,11 @@ import lombok.*;
 @NoArgsConstructor
 public class CreateBrandRequest {
 
-    @NotBlank(message = "Marka adı boş geçilemez")
-    @Size(min = 2, message = "Marka en az 2 karakter olmalıdır.")
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ-]+$", message = "Marka sadece harflerden oluşmalıdır.")
+    @NotBlank(message = "Brand name cannot be blank")
+    @Size(min = 2, message = "Brand name must be at least 2 characters.")
+    @Pattern(regexp = "^[a-zA-Z-]+$", message = "Brand name must consist of letters only.")
     String name;
-    @NotNull(message = "Fotoğraf null olamaz")
+    @NotNull(message = "Image cannot be null")
     int brandImageEntityId;
 
 

@@ -63,7 +63,7 @@ public class CarBodyTypeRules implements BaseItemRules {
 
     @Override
     public void existsByNameAndIdNot(String name, int id) {
-        //Kendisi hariç başka bir isim ile aynı olup olmadığını kontrol etmek için
+        //Check if it is the same as another name excluding itself
         if (carBodyTypeRepository.existsByNameIgnoreCaseAndIdNot(name, id)) {
             throw new AlreadyExistsException(BODY_TYPE_ALREADY_EXISTS);
         }

@@ -39,7 +39,7 @@ public class EmployeeEntity extends UserEntity {
 
     @PrePersist
     protected void beforeCreate() {
-        super.beforeCreate();  // BaseEntity sınıfındaki beforeCreate metodu çağırdık.
+        super.beforeCreate();  // Called the beforeCreate method in the BaseEntity class.
         this.setAuthority(EMPLOYEE);
     }
 

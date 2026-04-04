@@ -4,7 +4,7 @@ import lombok.Builder;
 
 @Builder(builderMethodName = "tResponseBuilder")
 public record TResponse<T>(
-        T response //-> DTO nesnesini buraya göndereceğiz.
+        T response //-> We send the DTO object here.
 ) {
 
 }

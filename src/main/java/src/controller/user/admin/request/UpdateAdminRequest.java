@@ -11,30 +11,30 @@ import src.service.user.model.DefaultUserStatus;
 @Setter
 public class UpdateAdminRequest {
 
-    @NotNull(message = "maaş null olamaz")
+    @NotNull(message = "Salary cannot be null")
     @Min(0)
     Double salary;
-    @NotNull(message = "id null olamaz")
+    @NotNull(message = "ID cannot be null")
     private int id;
-    @NotBlank(message = "isim boş geçilemez")
+    @NotBlank(message = "Name cannot be blank")
     @Size(min = 2, max = 20)
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ\\s]+$", message = "isim/soyisim sadece harflerden oluşmalıdır.")
+    @Pattern(regexp = "^[a-zA-Z\\s]+$", message = "Name/surname must consist of letters only.")
     private String name;
-    @NotBlank(message = "Soyisim boş geçilemez")
+    @NotBlank(message = "Surname cannot be blank")
     @Size(min = 2, max = 20)
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ\\s]+$", message = "isim/soyisim sadece harflerden oluşmalıdır.")
+    @Pattern(regexp = "^[a-zA-Z\\s]+$", message = "Name/surname must consist of letters only.")
     private String surname;
-    @NotBlank(message = "Admin mail adresi boş geçilemez")
-    @Email//-> Email alırken @gmail @hotmail gibi kullanımları denetler.
+    @NotBlank(message = "Admin email address cannot be blank")
+    @Email//-> Validates email format (e.g. @gmail, @hotmail).
     private String emailAddress;
 
-    @NotBlank(message = "Şifre boş geçilemez")
+    @NotBlank(message = "Password cannot be blank")
     @Size(min = 8, max = 30)
     private String password;
 
-    @NotBlank(message = "Çalışan telefon numarası boş geçilemez")
-    @Size(min = 10, max = 10, message = "Telefon numarası 10 hane olmalıdır.")
-    @Pattern(regexp = "^[0-9]+$", message = "Telefon numarası sadece sayılardan oluşmalıdır.")
+    @NotBlank(message = "Employee phone number cannot be blank")
+    @Size(min = 10, max = 10, message = "Phone number must be 10 digits.")
+    @Pattern(regexp = "^[0-9]+$", message = "Phone number must consist of digits only.")
     private String phoneNumber;
     private DefaultUserStatus status;
     private int userImageEntityId;

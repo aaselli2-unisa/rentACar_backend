@@ -40,7 +40,7 @@ public class AdminEntity extends UserEntity {
 
     @PrePersist
     protected void beforeCreate() {
-        super.beforeCreate();  // BaseEntity sınıfındaki beforeCreate metodu çağırdık.
+        super.beforeCreate();  // Called the beforeCreate method in the BaseEntity class.
         this.setAuthority(ADMIN);
     }
 

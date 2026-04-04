@@ -12,52 +12,52 @@ import src.service.vehicle.model.VehicleType;
 @Builder
 public class CreateCarRequest {
     private final VehicleType vehicleType = VehicleType.CAR;
-    @NotNull(message = "brandId null olamaz")
+    @NotNull(message = "Brand ID cannot be null")
     @Min(1)
     int carImageEntityId;
 
-    @NotNull(message = "brandId null olamaz")
+    @NotNull(message = "Brand ID cannot be null")
     @Min(1)
     int brandEntityId;
 
-    @NotNull(message = "id null olamaz")
+    @NotNull(message = "ID cannot be null")
     @Min(1)
     int carModelEntityId;
 
-    @NotNull(message = "carBodyTypeId null olamaz")
+    @NotNull(message = "Car body type ID cannot be null")
     @Min(1)
     int carBodyTypeEntityId;
 
-    @NotNull(message = "colorId null olamaz")
+    @NotNull(message = "Color ID cannot be null")
     @Min(1)
     int colorEntityId;
 
-    @NotNull(message = "segmentId null olamaz")
+    @NotNull(message = "Segment ID cannot be null")
     @Min(1)
     int carSegmentEntityId;
 
-    @NotNull(message = "yıl null olamaz.")
-    @Min(value = 2005, message = "Yıl en düşük 2005 olmalıdır.")
-    @Max(value = 2024, message = "Yıl en yüksek 2024 olmalıdır.")
+    @NotNull(message = "Year cannot be null")
+    @Min(value = 2005, message = "Year must be at least 2005.")
+    @Max(value = 2024, message = "Year must be at most 2024.")
     int year;
 
-    @Size(max = 500, message = "Acıklama en fazla 500 karakter olmalıdır.")
+    @Size(max = 500, message = "Description must be at most 500 characters.")
     String details;
 
-    @DecimalMin(value = "100.0", message = "Kiralama ücreti 110 den küçük olamaz.")
-    @NotNull(message = "rentalPrice can not be null")
+    @DecimalMin(value = "100.0", message = "Rental price cannot be less than 110.")
+    @NotNull(message = "Rental price cannot be null")
     double rentalPrice;
 
-    @NotBlank(message = "licensePlate null olamaz")
+    @NotBlank(message = "License plate cannot be blank")
     @Pattern(regexp = "^(\\d{2}[ ]?[A-Za-z]{1,3}[ ]?\\d{2}|\\d{2}[ ]?[A-Za-z]{2}[ ]?\\d{3})$", message = "Invalid license plate format")
     String licensePlate;
 
 
-    @NotNull(message = "kilometer null olamaz")
-    @Min(value = 1, message = "Kilometre 1 den küçük olamaz.")
+    @NotNull(message = "Kilometer cannot be null")
+    @Min(value = 1, message = "Kilometer must be at least 1.")
     int kilometer;
 
-    @NotNull(message = "beklenen ehliyet sınıfı null olamaz")
+    @NotNull(message = "Expected driving license type cannot be null")
     @Min(1)
     int expectedMinDrivingLicenseTypeId;
 
@@ -69,17 +69,17 @@ public class CreateCarRequest {
     @Min(1)
     int fuelTypeEntityId;
 
-    @NotNull(message = "seat null olamaz")
+    @NotNull(message = "Seat count cannot be null")
     @Min(1)
     @Max(15)
     int seat;
 
-    @NotNull(message = "luggage null olamaz")
+    @NotNull(message = "Luggage capacity cannot be null")
     @Min(1)
     @Max(15)
     int luggage;
 
-    @NotNull(message = "vehicleStatusId null olamaz")
+    @NotNull(message = "Vehicle status ID cannot be null")
     @Min(1)
     int vehicleStatusEntityId;
 

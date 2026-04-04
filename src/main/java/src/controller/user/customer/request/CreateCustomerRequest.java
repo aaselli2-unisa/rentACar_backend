@@ -11,27 +11,27 @@ import lombok.*;
 @Builder
 public class CreateCustomerRequest {
 
-    @NotBlank(message = "Müşteri adı boş geçilemez")
+    @NotBlank(message = "Customer name cannot be blank")
     @Size(min = 2, max = 20)
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ\\s]+$", message = "isim/soyisim sadece harflerden oluşmalıdır.")
+    @Pattern(regexp = "^[a-zA-Z\\s]+$", message = "Name/surname must consist of letters only.")
     String name;
 
-    @NotBlank(message = "Müşteri soyadı boş geçilemez")
+    @NotBlank(message = "Customer surname cannot be blank")
     @Size(min = 2, max = 20)
-    @Pattern(regexp = "^[a-zA-ZğüşıöçĞÜŞİÖÇ\\s]+$", message = "isim/soyisim sadece harflerden oluşmalıdır.")
+    @Pattern(regexp = "^[a-zA-Z\\s]+$", message = "Name/surname must consist of letters only.")
     String surname;
-    @NotBlank(message = "Müşteri mail adresi boş geçilemez")
-    @Email//-> Email alırken @gmail @hotmail gibi kullanımları denetler.
+    @NotBlank(message = "Customer email address cannot be blank")
+    @Email//-> Validates email format (e.g. @gmail, @hotmail).
     String emailAddress;
-    @NotBlank(message = "Müşteri şifresi boş geçilemez")
+    @NotBlank(message = "Customer password cannot be blank")
     @Size(min = 8, max = 30)
     String password;
 
-    @NotBlank(message = "Çalışan telefon numarası boş geçilemez")
-    @Size(min = 10, max = 10, message = "Telefon numarası 10 hane olmalıdır.")
-    @Pattern(regexp = "^[0-9]+$", message = "Telefon numarası sadece sayılardan oluşmalıdır.")
+    @NotBlank(message = "Employee phone number cannot be blank")
+    @Size(min = 10, max = 10, message = "Phone number must be 10 digits.")
+    @Pattern(regexp = "^[0-9]+$", message = "Phone number must consist of digits only.")
     String phoneNumber;
-    @Size(max = 6, message = "Ehliyet seri numarası 6 haneli olmalıdır.")
+    @Size(max = 6, message = "Driving license number must be 6 digits.")
     String drivingLicenseNumber;
     @NotNull
     int drivingLicenseTypeEntityId;

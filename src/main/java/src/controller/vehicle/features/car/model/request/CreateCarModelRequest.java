@@ -11,11 +11,11 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 public class CreateCarModelRequest {
-    @NotNull(message = "Marka id null olamaz")
+    @NotNull(message = "Brand ID cannot be null")
     int brandEntityId;
 
-    @NotBlank(message = "Model adı boş geçilemez")
-    @Size(min = 2, message = "Model en az 2 karakter olmalıdır.")
+    @NotBlank(message = "Model name cannot be blank")
+    @Size(min = 2, message = "Model name must be at least 2 characters.")
     String carModelEntityName;
 
 

@@ -4,19 +4,19 @@ public enum DefaultCarDrivingLicenseType {
 
 
     //-----------Cars----------
-    NONE("Yok"),   //Yok
-    B("Otomobil ve Kamyonet"),   //Otomobil ve Kamyonet
-    BE("Römorklu Otomobil ve Kamyonet"),  //Römorklu Otomobil ve Kamyonet
-    C1("7500 kg'a kadar Kamyon ve Çekici"),  //7500 kg'a kadar Kamyon ve Çekici
-    C1E("12000 kg'a kadar Kamyon ve Çekici"), //12000 kg'a kadar Kamyon ve Çekici
-    C("Kamyon ve Çekici"),   //Kamyon ve Çekici
-    CE("Römorklu Kamyon ve Çekici"),  //Römorklu Kamyon ve Çekici
-    D1("Minibüs"),  //Minibüs
-    D1E("Römorklu Minibüs"), //Römorklu Minibüs
-    D("Minibüs ve Otobüs"),   //Minibüs ve Otobüs
-    E("Römorklu Minibüs ve Otobüs"),   //Römorklu Minibüs ve Otobüs
-    F("Lastik Tekerlekli Traktör"),   //Lastik Tekerlekli Traktör
-    G("İş Makinası");    //İş Makinası
+    NONE("None"),   //None
+    B("Passenger car and light van"),   //Passenger car and light van
+    BE("Passenger car and light van with trailer"),  //Passenger car and light van with trailer
+    C1("Truck and tractor up to 7500 kg"),  //Truck and tractor up to 7500 kg
+    C1E("Truck and tractor up to 12000 kg"), //Truck and tractor up to 12000 kg
+    C("Truck and tractor"),   //Truck and tractor
+    CE("Truck and tractor with trailer"),  //Truck and tractor with trailer
+    D1("Minibus"),  //Minibus
+    D1E("Minibus with trailer"), //Minibus with trailer
+    D("Minibus and bus"),   //Minibus and bus
+    E("Minibus and bus with trailer"),   //Minibus and bus with trailer
+    F("Rubber-wheeled tractor"),   //Rubber-wheeled tractor
+    G("Construction machinery");    //Construction machinery
     private final String label;
 
     DefaultCarDrivingLicenseType(String label) {
