@@ -4,6 +4,7 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringSubstitutor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,10 @@ import java.util.UUID;
 @Slf4j
 public class EmailServiceImpl implements EmailService {
     public static final String EMAIL_CONFIRMATION = "EMAIL_CONFIRMATION";
+
+    @Value("${app.base-url}")
+    private String baseUrl;
+
     private final JavaMailSender javaMailSender;
     private final OtpEntityServiceImpl otpEntityServiceImpl;
 
@@ -45,11 +50,7 @@ public class EmailServiceImpl implements EmailService {
                 .build();
         otpEntityServiceImpl.createOtp(otpEntity);
 
-        String registerConfirmUrl = String.format(
-                "%s%s%s",
-                "%%s",
-                "/api/v1/register/confirm",
-                otpEntity.getVerificationToken());
+        String registerConfirmUrl = baseUrl + "/api/v1/verify/email?token=" + otpEntity.getVerificationToken();
 
         sendEmail(registerConfirmUrl, email);
     }
