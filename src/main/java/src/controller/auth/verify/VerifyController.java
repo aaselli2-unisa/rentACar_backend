@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import src.controller.TResponse;
 import src.core.security.model.JwtToken;
+import src.service.auth.VerifyService;
 
 import static src.controller.auth.verify.LogConstant.VERIFY_EMAIL_ADDRESS_REQUEST_RECEIVED;
 import static src.controller.auth.verify.LogConstant.VERIFY_EMAIL_ADDRESS_SUCCESSFUL;
@@ -19,10 +20,13 @@ import static src.controller.auth.verify.LogConstant.VERIFY_EMAIL_ADDRESS_SUCCES
 @RequiredArgsConstructor
 public class VerifyController {
 
+    private final VerifyService verifyService;
+
     @GetMapping("/email")
     ResponseEntity<TResponse<JwtToken>> verifyEmailAddress(@RequestParam("token") String token) {
         log.info(VERIFY_EMAIL_ADDRESS_REQUEST_RECEIVED, token);
+        JwtToken jwtToken = verifyService.verifyEmailAddress(token);
         log.info(VERIFY_EMAIL_ADDRESS_SUCCESSFUL);
-        return null;
+        return ResponseEntity.ok(TResponse.<JwtToken>tResponseBuilder().response(jwtToken).build());
     }
 }

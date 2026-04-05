@@ -69,7 +69,8 @@ public enum NotFoundExceptionType {
 
     RENTAL_STATUS_NOT_FOUND(1040, "Rental status not found"),
     RENTAL_STATUS_LIST_NOT_FOUND(1041, "No rental status found matching the given criteria"),
-    EMAIL_ADDRESS_NOT_FOUND(1042, "No user found for this email address");
+    EMAIL_ADDRESS_NOT_FOUND(1042, "No user found for this email address"),
+    OTP_NOT_FOUND(1043, "Verification token not found or already used");
     //------------------------------------------------------------------
     private final Integer errorCode;
     private final String message;
