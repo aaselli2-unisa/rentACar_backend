@@ -35,7 +35,7 @@ public class CarController {
     }
 
     @PutMapping
-    public ResponseEntity<TResponse<CarResponse>> updateCar(@Valid @RequestBody UpdateCarRequest updateCarRequest) throws IOException {
+    public ResponseEntity<TResponse<CarResponse>> updateCar(@RequestBody UpdateCarRequest updateCarRequest) throws IOException {
         log.info(UPDATING_CAR, updateCarRequest);
         CarResponse updatedCar = this.carService.update(updateCarRequest);
         log.info(CAR_UPDATED, updatedCar);

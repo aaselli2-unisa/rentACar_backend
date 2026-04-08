@@ -54,11 +54,13 @@ public class EmployeeServiceImpl implements EmployeeService {
         return entityService.getById(id).toModel();
     }
 
+    @Transactional
     @Override
     public List<EmployeeResponse> getAll() {
         return mapToDTOList(entityService.getAll());
     }
 
+    @Transactional
     @Override
     public List<EmployeeResponse> getAllBySalaryBetween(double salary1, double salary2) {
         return mapToDTOList(entityService.getAllBySalaryBetween(salary1, salary2));
