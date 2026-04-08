@@ -41,21 +41,24 @@ public class CustomerEntityServiceImpl implements CustomerEntityService {
 
     @Override
     public CustomerEntity update(UpdateCustomerRequest updateCustomerRequest) {
-        CustomerEntity customerEntity = CustomerEntity.customerBuilder()
-                .id(updateCustomerRequest.getId())
-                .name(updateCustomerRequest.getName())
-                .surname(updateCustomerRequest.getSurname())
-                .emailAddress(updateCustomerRequest.getEmailAddress())
-                .password(updateCustomerRequest.getPassword())
-                .phoneNumber(updateCustomerRequest.getPhoneNumber())
-                .drivingLicenseNumber(updateCustomerRequest.getDrivingLicenseNumber())
-                .drivingLicenseTypeEntity(drivingLicenseTypeEntityService.getById(
-                        updateCustomerRequest.getDrivingLicenseTypeEntityId()))
-                .status(updateCustomerRequest.getStatus())
-                .userImageEntity(userImageService.getById(updateCustomerRequest.getUserImageEntityId()))
-                .status(PENDING_VERIFYING)
-                .build();
-        return repository.save(customerEntity);
+        CustomerEntity existing = repository.findById(updateCustomerRequest.getId())
+                .orElseThrow(() -> new DataNotFoundException(CUSTOMER_DATA_NOT_FOUND));
+
+        if (updateCustomerRequest.getName() != null) existing.setName(updateCustomerRequest.getName());
+        if (updateCustomerRequest.getSurname() != null) existing.setSurname(updateCustomerRequest.getSurname());
+        if (updateCustomerRequest.getEmailAddress() != null) existing.setEmailAddress(updateCustomerRequest.getEmailAddress());
+        if (updateCustomerRequest.getPassword() != null) existing.setPassword(updateCustomerRequest.getPassword());
+        if (updateCustomerRequest.getPhoneNumber() != null) existing.setPhoneNumber(updateCustomerRequest.getPhoneNumber());
+        if (updateCustomerRequest.getDrivingLicenseNumber() != null) existing.setDrivingLicenseNumber(updateCustomerRequest.getDrivingLicenseNumber());
+        if (updateCustomerRequest.getDrivingLicenseTypeEntityId() > 0) {
+            existing.setDrivingLicenseTypeEntity(drivingLicenseTypeEntityService.getById(updateCustomerRequest.getDrivingLicenseTypeEntityId()));
+        }
+        if (updateCustomerRequest.getUserImageEntityId() > 0) {
+            existing.setUserImageEntity(userImageService.getById(updateCustomerRequest.getUserImageEntityId()));
+        }
+        if (updateCustomerRequest.getStatus() != null) existing.setStatus(updateCustomerRequest.getStatus());
+
+        return repository.save(existing);
     }
 
     @Override

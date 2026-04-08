@@ -55,6 +55,7 @@ public class AdminServiceImpl implements AdminService {
         return entityService.getById(id).toModel();
     }
 
+    @Transactional
     @Override
     public List<AdminResponse> getAll() {
         return mapToDTOList(entityService.getAll());

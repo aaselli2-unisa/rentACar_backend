@@ -72,6 +72,7 @@ public class CarModelServiceImpl implements CarModelService {
         entityService.update(carModelEntity);
     }
 
+    @Transactional
     @Override
     public List<CarModelResponse> getAllByBrandId(int brandId) {
         return mapToDTOList(entityService.getAllByBrandId(brandId));

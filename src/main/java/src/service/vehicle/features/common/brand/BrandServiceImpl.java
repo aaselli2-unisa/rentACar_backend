@@ -51,6 +51,7 @@ public class BrandServiceImpl implements BrandService {
         return entityService.getById(id).toModel();
     }
 
+    @Transactional
     @Override
     public List<BrandResponse> getAll() {
         return mapToDTOList(entityService.getAll());

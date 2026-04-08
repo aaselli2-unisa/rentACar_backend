@@ -56,15 +56,35 @@ public class CarServiceImpl implements CarService {
 
     @Override
     public CarResponse update(UpdateCarRequest updateCarRequest) throws IOException {
-        updateCarRequest = rules.fix(updateCarRequest);
-        rules.check(updateCarRequest);
-        CarImageEntity carImage = carImageService.getById(updateCarRequest.getCarImageEntityId());
-        if (carImage.getId() != updateCarRequest.getCarImageEntityId()) {
-            carImageService.delete(carImage.getId());
+        CarEntity existing = entityService.getById(updateCarRequest.getId());
+
+        boolean isFullUpdate = updateCarRequest.getBrandEntityId() > 0
+                && updateCarRequest.getCarModelEntityId() > 0
+                && updateCarRequest.getLicensePlate() != null
+                && !updateCarRequest.getLicensePlate().isBlank();
+
+        if (isFullUpdate) {
+            updateCarRequest = rules.fix(updateCarRequest);
+            rules.check(updateCarRequest);
+            CarImageEntity carImage = carImageService.getById(updateCarRequest.getCarImageEntityId());
+            if (carImage.getId() != updateCarRequest.getCarImageEntityId()) {
+                carImageService.delete(carImage.getId());
+            }
+            return entityService.update(updateCarRequest).toModel();
         }
-        return entityService.update(updateCarRequest).toModel();
+
+        if (updateCarRequest.getRentalPrice() > 0) {
+            existing.setRentalPrice(updateCarRequest.getRentalPrice());
+        }
+        if (updateCarRequest.getDetails() != null) {
+            existing.setDetails(updateCarRequest.getDetails());
+        }
+        existing.setAvailable(updateCarRequest.isAvailable());
+
+        return entityService.update(existing).toModel();
     }
 
+    @Transactional
     @Override
     public List<CarResponse> getAll() {
         return markAllForDrivingLicenseSuitable(entityService.getAll(), null);
@@ -76,37 +96,43 @@ public class CarServiceImpl implements CarService {
         return mapToDTOList(entityService.getAllByDeletedState(isDeleted));
     }
 
+    @Transactional
     @Override
     public List<CarResponse> getAllByStatus(Integer statusId) {
         return mapToDTOList(entityService.getAllByStatus(statusId));
     }
 
+    @Transactional
     @Override
     public List<CarResponse> getAllByColorId(int id) {
         return mapToDTOList(entityService.getAllByColorId(id));
     }
 
-
+    @Transactional
     @Override
     public List<CarResponse> getAllByModelId(int id) {
         return mapToDTOList(entityService.getAllByModelId(id));
     }
 
+    @Transactional
     @Override
     public List<CarResponse> getAllByBrandId(int brandId) {
         return mapToDTOList(entityService.getAllByBrandId(brandId));
     }
 
+    @Transactional
     @Override
     public List<CarResponse> getAllByYearBetween(int startYear, int endYear) {
         return mapToDTOList(entityService.getAllByYearBetween(startYear, endYear));
     }
 
+    @Transactional
     @Override
     public List<CarResponse> getAllByRentalPriceBetween(double startPrice, double endPrice) {
         return mapToDTOList(entityService.getAllByRentalPriceBetween(startPrice, endPrice));
     }
 
+    @Transactional
     @Override
     public List<CarResponse> getAllByAvailabilityBetween(LocalDate startDate, LocalDate endDate) {
         List<CarEntity> allCars = entityService.getAll();
@@ -115,6 +141,7 @@ public class CarServiceImpl implements CarService {
         return mapToDTOList(availableCars);
     }
 
+    @Transactional
     @Override
     public List<CarResponse> getAllByIsDrivingLicenseSuitable(Integer customerId) {
         List<CarEntity> allCars = entityService.getAll();
@@ -122,6 +149,7 @@ public class CarServiceImpl implements CarService {
         return mapToDTOList(carsByDrivingLicenseSuitable);
     }
 
+    @Transactional
     @Override
     public List<CarResponse> getAllFiltered(Integer customerId, Boolean licenseSuitable,
                                             LocalDate startDate, LocalDate endDate,
