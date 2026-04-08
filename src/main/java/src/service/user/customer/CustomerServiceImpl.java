@@ -43,14 +43,40 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public CustomerResponse update(UpdateCustomerRequest updateCustomerRequest) {
-        updateCustomerRequest = rules.fix(updateCustomerRequest);
-        rules.check(updateCustomerRequest);
-        updateCustomerRequest.setPassword(passwordEncoder.encode(updateCustomerRequest.getPassword()));
-        UserImageEntity userImage = userImageService.getById(updateCustomerRequest.getUserImageEntityId());
-        if (userImage.getId() != updateCustomerRequest.getUserImageEntityId()) {
-            userImageService.delete(userImage.getId());
+        boolean isFullUpdate = updateCustomerRequest.getEmailAddress() != null
+                && !updateCustomerRequest.getEmailAddress().isBlank()
+                && updateCustomerRequest.getPassword() != null
+                && !updateCustomerRequest.getPassword().isBlank();
+
+        if (isFullUpdate) {
+            updateCustomerRequest = rules.fix(updateCustomerRequest);
+            rules.check(updateCustomerRequest);
+            updateCustomerRequest.setPassword(passwordEncoder.encode(updateCustomerRequest.getPassword()));
+            if (updateCustomerRequest.getUserImageEntityId() > 0) {
+                UserImageEntity currentImage = entityService.getById(updateCustomerRequest.getId()).getUserImageEntity();
+                if (currentImage != null && currentImage.getId() != updateCustomerRequest.getUserImageEntityId()) {
+                    userImageService.delete(currentImage.getId());
+                }
+            } else {
+                UserImageEntity existingImage = entityService.getById(updateCustomerRequest.getId()).getUserImageEntity();
+                if (existingImage != null) {
+                    updateCustomerRequest.setUserImageEntityId(existingImage.getId());
+                }
+            }
+            return entityService.update(updateCustomerRequest).toModel();
         }
-        return entityService.update(updateCustomerRequest).toModel();
+
+        CustomerEntity existing = entityService.getById(updateCustomerRequest.getId());
+        if (updateCustomerRequest.getName() != null && !updateCustomerRequest.getName().isBlank()) {
+            existing.setName(updateCustomerRequest.getName());
+        }
+        if (updateCustomerRequest.getSurname() != null && !updateCustomerRequest.getSurname().isBlank()) {
+            existing.setSurname(updateCustomerRequest.getSurname());
+        }
+        if (updateCustomerRequest.getPhoneNumber() != null && !updateCustomerRequest.getPhoneNumber().isBlank()) {
+            existing.setPhoneNumber(updateCustomerRequest.getPhoneNumber());
+        }
+        return entityService.update(existing).toModel();
     }
 
 
@@ -65,6 +91,7 @@ public class CustomerServiceImpl implements CustomerService {
         return entityService.getByEmailAddress(emailAddress).toModel();
     }
 
+    @Transactional
     @Override
     public List<CustomerResponse> getAll() {
         return mapToDTOList(entityService.getAll());

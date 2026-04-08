@@ -387,7 +387,7 @@ public class SeedDataConfig implements CommandLineRunner {
                         .startDate(LocalDate.parse("2024-02-07"))
                         .endDate(LocalDate.parse("2024-02-12"))
                         .paymentTypeId(1)
-                        .discountCode("HOSGELDIN")
+                        .discountCode("WELCOME")
                         .creditCardInformation(creditCardInformation)
                         .build());
 
@@ -397,7 +397,7 @@ public class SeedDataConfig implements CommandLineRunner {
                         .startDate(LocalDate.parse("2024-02-10"))
                         .endDate(LocalDate.parse("2024-02-15"))
                         .paymentTypeId(1)
-                        .discountCode("")
+                        .discountCode("NONE")
                         .creditCardInformation(creditCardInformation)
                         .build());
 
@@ -419,7 +419,7 @@ public class SeedDataConfig implements CommandLineRunner {
                         .startDate(LocalDate.parse("2024-03-10"))
                         .endDate(LocalDate.parse("2024-03-15"))
                         .paymentTypeId(1)
-                        .discountCode("HOSGELDIN")
+                        .discountCode("WELCOME")
                         .creditCardInformation(creditCardInformation)
                         .build());
 

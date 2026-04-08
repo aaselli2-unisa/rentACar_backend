@@ -2,6 +2,7 @@ package src.service.payment.detail;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import src.controller.payment.detail.request.UpdatePaymentDetailsRequest;
 import src.controller.payment.detail.response.PaymentDetailsResponse;
 import src.repository.payment.detail.PaymentDetailsEntity;
@@ -31,11 +32,13 @@ public class PaymentDetailsServiceImpl implements PaymentDetailsService {
         return entityService.getById(id).toModel();
     }
 
+    @Transactional
     @Override
     public List<PaymentDetailsResponse> getAll() {
         return mapToDTOList(entityService.getAll());
     }
 
+    @Transactional
     @Override
     public List<PaymentDetailsResponse> getAllFiltered(Double minAmount, Double maxAmount,
                                                        LocalDate minDate, LocalDate maxDate, Boolean isDeleted) {

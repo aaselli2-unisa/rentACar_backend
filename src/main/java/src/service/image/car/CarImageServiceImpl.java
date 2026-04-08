@@ -16,6 +16,7 @@ import java.util.List;
 
 import static src.core.exception.type.FileExceptionType.PHOTO_DELETE_FAILED;
 import static src.core.exception.type.FileExceptionType.PHOTO_UPLOAD_FAILED;
+import static src.core.exception.type.FileExceptionType.PHOTO_IS_EMPTY;
 import static src.core.exception.type.NotFoundExceptionType.IMAGE_NOT_FOUND;
 
 @Service
@@ -28,7 +29,9 @@ public class CarImageServiceImpl implements CarImageService {
 
     @Override
     public CarImageEntity create(MultipartFile file, String licensePlate) throws IOException {
-
+        if (file == null || file.isEmpty()) {
+            throw new FileException(PHOTO_IS_EMPTY);
+        }
         try {
             byte[] newByte = ImageUtils.resizeImage(file.getBytes(), 1920, 1080);
             String imageUrl = cloudinaryServiceImpl.uploadFileCar(file, licensePlate);

@@ -14,7 +14,7 @@ target/
 .sts4-cache
 src/main/resources/application.properties
 tobeto_rentAcar_crew_project/.idea/misc.xml
-
+src/main/resources/assets/
 ### IntelliJ IDEA ###
 .idea
 *.iws

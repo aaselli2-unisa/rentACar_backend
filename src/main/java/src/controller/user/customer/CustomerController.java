@@ -33,7 +33,7 @@ public class CustomerController {
     }
 
     @PutMapping
-    public ResponseEntity<TResponse<CustomerResponse>> updateCustomer(@RequestBody @Valid UpdateCustomerRequest updateCustomerRequest) {
+    public ResponseEntity<TResponse<CustomerResponse>> updateCustomer(@RequestBody UpdateCustomerRequest updateCustomerRequest) {
         log.info(UPDATING_CUSTOMER, updateCustomerRequest.toString());
         CustomerResponse updatedCustomer = this.customerService.update(updateCustomerRequest);
         log.info(CUSTOMER_UPDATED, updatedCustomer.toString());

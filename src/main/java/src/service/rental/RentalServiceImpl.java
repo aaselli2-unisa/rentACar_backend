@@ -143,6 +143,7 @@ public class RentalServiceImpl implements RentalService {
         entityService.update(rentalEntity);
     }
 
+    @Transactional
     @Override
     public List<RentalResponse> getAll() {
         return mapToDTOList(entityService.getAll());
@@ -154,6 +155,7 @@ public class RentalServiceImpl implements RentalService {
         return mapToDTOList(entityService.getAllByDeletedState(isDeleted));
     }
 
+    @Transactional
     @Override
     public List<RentalResponse> getAllByStatus(int statusId) {
         List<RentalResponse> rentalResponseList = mapToDTOList(entityService.getAllByStatus(statusId));
