@@ -32,16 +32,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
-            String username = jwtService.extractUsername(token);
-            var auth = SecurityContextHolder.getContext().getAuthentication();
-            if (username != null && auth == null) {
-                UserDetails user = userService.loadUserByUsername(username);
-                if (jwtService.isTokenValid(token, user)) {
-                    UsernamePasswordAuthenticationToken authenticationToken =
-                            new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-                    authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+            try {
+                String username = jwtService.extractUsername(token);
+                var auth = SecurityContextHolder.getContext().getAuthentication();
+                if (username != null && auth == null) {
+                    UserDetails user = userService.loadUserByUsername(username);
+                    if (jwtService.isTokenValid(token, user)) {
+                        UsernamePasswordAuthenticationToken authenticationToken =
+                                new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+                        authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                    }
                 }
+            } catch (Exception e) {
+                // Malformed or invalid token — do not authenticate, continue filter chain
             }
         }
         filterChain.doFilter(request, response);

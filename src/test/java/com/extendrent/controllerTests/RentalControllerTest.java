@@ -225,7 +225,7 @@ public class RentalControllerTest {
         when(rentalService.getAllByStatus(statusId)).thenReturn(rentalList);
 
         // When
-        ResponseEntity<TResponse<List<RentalResponse>>> responseEntity = rentalController.getAllByDeletedState(false);
+        ResponseEntity<TResponse<List<RentalResponse>>> responseEntity = rentalController.getAllByStatus(statusId);
 
         // Then
         verify(rentalService, times(1)).getAllByStatus(statusId);

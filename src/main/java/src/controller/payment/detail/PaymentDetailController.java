@@ -28,7 +28,7 @@ public class PaymentDetailController {
             @Valid @RequestBody UpdatePaymentDetailsRequest updatePaymentDetailsRequest) {
         log.info(UPDATING_PAYMENT_DETAILS, updatePaymentDetailsRequest.toString());
         PaymentDetailsResponse updatedPaymentDetails = this.paymentDetailsService.update(updatePaymentDetailsRequest);
-        log.info(PAYMENT_DETAILS_UPDATED, updatedPaymentDetails.toString());
+        log.info(PAYMENT_DETAILS_UPDATED, updatedPaymentDetails);
         return new ResponseEntity<>(TResponse.<PaymentDetailsResponse>tResponseBuilder()
                 .response(updatedPaymentDetails).build(), HttpStatus.OK);
     }
@@ -37,7 +37,7 @@ public class PaymentDetailController {
     public ResponseEntity<TResponse<PaymentDetailsResponse>> getById(@PathVariable int id) {
         log.info(GETTING_PAYMENT_DETAILS, id);
         PaymentDetailsResponse paymentDetails = this.paymentDetailsService.getById(id);
-        log.info(RETRIEVED_PAYMENT_DETAILS, paymentDetails.toString());
+        log.info(RETRIEVED_PAYMENT_DETAILS, paymentDetails);
         return new ResponseEntity<>(TResponse.<PaymentDetailsResponse>tResponseBuilder()
                 .response(paymentDetails).build(), HttpStatus.OK);
     }

@@ -1,6 +1,7 @@
 package src.core.security;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
@@ -62,12 +63,20 @@ public class JwtService {
     }
 
     public boolean isTokenValid(String token, UserDetails user) {
-        final String usernameFromToken = extractUsername(token);
-        return (user.getUsername().equals(usernameFromToken)) && !isTokenExpired(token);
+        try {
+            final String usernameFromToken = extractUsername(token);
+            return (user.getUsername().equals(usernameFromToken)) && !isTokenExpired(token);
+        } catch (ExpiredJwtException e) {
+            return false;
+        }
     }
 
     public boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        try {
+            return extractExpiration(token).before(new Date());
+        } catch (ExpiredJwtException e) {
+            return true;
+        }
     }
 
     public Date extractExpiration(String token) {
