@@ -1,10 +1,8 @@
 package src.core.exception.type;
 
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 
 @Getter
-@RequiredArgsConstructor
 public enum NotFoundExceptionType {
 
     GENERIC_EXCEPTION(1, "Unknown error"),
@@ -74,4 +72,9 @@ public enum NotFoundExceptionType {
     //------------------------------------------------------------------
     private final Integer errorCode;
     private final String message;
+
+    NotFoundExceptionType(Integer errorCode, String message) {
+        this.errorCode = errorCode;
+        this.message = message;
+    }
 }
