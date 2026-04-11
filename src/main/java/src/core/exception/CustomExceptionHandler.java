@@ -3,11 +3,15 @@ package src.core.exception;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import src.controller.TResponse;
 import src.core.exception.response.ErrorResponse;
 import src.core.exception.type.NotFoundExceptionType;
@@ -37,7 +41,6 @@ public class CustomExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public TResponse<?> handleDataNotFoundException(DataNotFoundException e) {
         log(ERROR_DATA_NOT_FOUND, e);
-        e.printStackTrace();
         return TResponse.tResponseBuilder()
                 .response(new ErrorResponse(e.getNotFoundExceptionType(), Collections.singletonList(e.getDetail())))
                 .build();
@@ -88,6 +91,45 @@ public class CustomExceptionHandler {
                 .build();
     }
 
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public TResponse<?> handleMissingRequestParameter(MissingServletRequestParameterException e) {
+        log(ERROR_VALIDATION, e);
+        return TResponse.tResponseBuilder()
+                .response(new ErrorResponse(ValidationExceptionType.VALIDATION_EXCEPTION,
+                        Collections.singletonList("Missing required parameter: " + e.getParameterName())))
+                .build();
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public TResponse<?> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        log(ERROR_VALIDATION, e);
+        return TResponse.tResponseBuilder()
+                .response(new ErrorResponse(ValidationExceptionType.VALIDATION_EXCEPTION,
+                        Collections.singletonList("Invalid parameter type: " + e.getName())))
+                .build();
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public TResponse<?> handleInvalidBody(HttpMessageNotReadableException e) {
+        log(ERROR_VALIDATION, e);
+        return TResponse.tResponseBuilder()
+                .response(new ErrorResponse(ValidationExceptionType.VALIDATION_EXCEPTION,
+                        Collections.singletonList("Malformed request body")))
+                .build();
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+    public TResponse<?> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException e) {
+        log(ERROR_VALIDATION, e);
+        return TResponse.tResponseBuilder()
+                .response(new ErrorResponse(ValidationExceptionType.VALIDATION_EXCEPTION,
+                        Collections.singletonList("Unsupported media type")))
+                .build();
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -114,7 +156,6 @@ public class CustomExceptionHandler {
     }
 
     private void log(String errorLogConstant, Exception e) {
-        logger.error(errorLogConstant, e.toString());
-        e.printStackTrace();
+        logger.error(errorLogConstant, e);
     }
 }

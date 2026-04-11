@@ -3,7 +3,9 @@ package src.controller.user;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +27,7 @@ public class UserController {
     @GetMapping
     public ResponseEntity<TResponse<Page<UserResponse>>> getAllUsers(Pageable pageable) {
         log.info(GETTING_ALL_USERS);
-        Page<UserResponse> users = userService.getAll(pageable);
+        Page<UserResponse> users = normalizePageForSerialization(userService.getAll(pageable));
         log.info(RETRIEVED_ALL_USERS, users.getTotalElements());
         return new ResponseEntity<>(TResponse.<Page<UserResponse>>tResponseBuilder()
                 .response(users)
@@ -84,5 +86,17 @@ public class UserController {
         userService.blockUser(id);
         log.info(USER_BLOCKED, id);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+    private Page<UserResponse> normalizePageForSerialization(Page<UserResponse> users) {
+        if (users == null) {
+            return Page.empty(PageRequest.of(0, 1));
+        }
+        if (users.getPageable().isPaged()) {
+            return users;
+        }
+
+        int safePageSize = Math.max(users.getNumberOfElements(), 1);
+        return new PageImpl<>(users.getContent(), PageRequest.of(0, safePageSize), users.getTotalElements());
     }
 }

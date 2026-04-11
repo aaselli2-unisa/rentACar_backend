@@ -1,10 +1,8 @@
 package src.core.exception.type;
 
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 
 @Getter
-@RequiredArgsConstructor
 public enum AlreadyExistsExceptionType {
 
     USER_ALREADY_EXISTS(2001, "User already exists"),
@@ -49,4 +47,9 @@ public enum AlreadyExistsExceptionType {
     //------------------------------------------------------------------
     private final Integer errorCode;
     private final String message;
+
+    AlreadyExistsExceptionType(Integer errorCode, String message) {
+        this.errorCode = errorCode;
+        this.message = message;
+    }
 }
