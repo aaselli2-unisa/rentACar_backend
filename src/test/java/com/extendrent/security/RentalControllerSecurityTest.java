@@ -193,20 +193,17 @@ class RentalControllerSecurityTest {
     // ======================================================================
 
     @Nested
-    @DisplayName("VULNERABILITY – no ownership check: any customer can read any rental")
+    @DisplayName("Rental read access is restricted for CUSTOMER by security policy")
     class RentalOwnershipCheck {
 
         @Test
-        @DisplayName("CUSTOMER can read rentals belonging to other customers – FAILS until fixed")
+        @DisplayName("CUSTOMER cannot read all rentals (ADMIN-only endpoint)")
         @WithMockUser(username = "customer1@example.com", roles = "CUSTOMER")
         void getRentalById_canAccessOtherCustomerRental() throws Exception {
-            // The controller returns the rental regardless of who the logged-in user is.
-            // A correct implementation would verify that rental.customerId == currentUser.id
+            // Current hardening uses role-based restriction: rentals listing is ADMIN-only.
             when(rentalService.getAll()).thenReturn(List.of());
             mockMvc.perform(get("/api/v1/rentals"))
-                    .andExpect(status().isOk()); // passes — no ownership filtering
-            // Assert: the rental list should only contain THIS customer's rentals,
-            // not all rentals in the system. Currently no filtering is done.
+                    .andExpect(status().isForbidden());
         }
     }
 

@@ -138,23 +138,15 @@ class CorsSecurityTest {
     class DangerousMethodsPreflight {
 
         @Test
-        @DisplayName("DELETE method preflight is accepted from any origin – documents additional risk")
+        @DisplayName("DELETE preflight from untrusted origin must not expose CORS allow headers")
         void deleteMethod_allowedFromAnyOrigin() throws Exception {
-            // DELETE operations on rentals or users being accessible cross-origin is a critical risk.
+            // Untrusted origins must not receive allow headers for dangerous methods.
             mockMvc.perform(options("/api/v1/auth/signin")
                             .header("Origin", "https://malicious.com")
                             .header("Access-Control-Request-Method", "DELETE")
                             .header("Access-Control-Request-Headers", "Authorization"))
-                    .andExpect(result -> {
-                        // Document the current state: DELETE is allowed in preflight
-                        String allowMethods = result.getResponse()
-                                .getHeader("Access-Control-Allow-Methods");
-                        // After security fix this should either not include DELETE or
-                        // only be allowed for trusted origins
-                        org.junit.jupiter.api.Assertions.assertNotNull(
-                                allowMethods,
-                                "CORS preflight must respond with allowed methods header");
-                    });
+                    .andExpect(header().doesNotExist("Access-Control-Allow-Origin"))
+                    .andExpect(header().doesNotExist("Access-Control-Allow-Methods"));
         }
     }
 
