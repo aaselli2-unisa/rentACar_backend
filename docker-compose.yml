@@ -1,0 +1,76 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: rentacar-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: rentacar
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD_FILE: /run/secrets/DB_PASSWORD
+    # Porta commentata: il DB non deve essere esposto all'host in produzione.
+    # Decommentare SOLO per sviluppo locale (DBeaver, psql, ecc.)
+    # ports:
+    #   - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    secrets:
+      - DB_PASSWORD
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d rentacar"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rentacar-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/rentacar
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8080:8080"
+    secrets:
+      - DB_PASSWORD
+      - JWT_SECRET
+      - CLOUDINARY_CLOUD_NAME
+      - CLOUDINARY_API_KEY
+      - CLOUDINARY_API_SECRET
+      - MAIL_USERNAME
+      - MAIL_PASSWORD
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+volumes:
+  pgdata:
+
+secrets:
+  DB_PASSWORD:
+    file: ./secrets/DB_PASSWORD
+  JWT_SECRET:
+    file: ./secrets/JWT_SECRET
+  CLOUDINARY_CLOUD_NAME:
+    file: ./secrets/CLOUDINARY_CLOUD_NAME
+  CLOUDINARY_API_KEY:
+    file: ./secrets/CLOUDINARY_API_KEY
+  CLOUDINARY_API_SECRET:
+    file: ./secrets/CLOUDINARY_API_SECRET
+  MAIL_USERNAME:
+    file: ./secrets/MAIL_USERNAME
+  MAIL_PASSWORD:
+    file: ./secrets/MAIL_PASSWORD
+
+

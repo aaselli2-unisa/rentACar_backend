@@ -67,10 +67,10 @@ import src.service.vehicle.features.common.status.VehicleStatusService;
 import src.service.vehicle.features.common.status.model.DefaultVehicleStatus;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
@@ -117,11 +117,7 @@ public class SeedDataConfig implements CommandLineRunner {
                 progress.setExtraMessage("Creating default brands...");
                 for (DefaultBrand brandEnum : DefaultBrand.getAll()) {
                     URL url = new URL(brandEnum.getImageUrl());
-                    Path path = Paths.get("src/main/resources/assets/default/brand", brandEnum.name() + ".jpg");
-                    if (Files.exists(path)) {
-                        Files.delete(path);
-                    }
-                    Files.copy(url.openStream(), path);
+                    Path path = downloadToTempJpg(url, "brand_" + brandEnum.name());
                     MultipartFile file = new MockMultipartFile(
                             brandEnum.name(), path.getFileName().toString(), "image/jpeg", Files.readAllBytes(path));
                     brandService.create(new CreateBrandRequest(brandEnum.getLabel(),
@@ -259,12 +255,7 @@ public class SeedDataConfig implements CommandLineRunner {
                     DefaultCarImage defaultCarImageEnum = defaultCarImageEnums[i - 1];
 
                     URL url = new URL(defaultCarImageEnum.getUrl());
-                    Path path = Paths.get("src/main/resources/assets/default/car", defaultCarImageEnum.name() + ".jpg");
-                    if (Files.exists(path)) {
-                        Files.delete(path);
-                    }
-
-                    Files.copy(url.openStream(), path);
+                    Path path = downloadToTempJpg(url, "car_" + defaultCarImageEnum.name());
 
                     MultipartFile file = new MockMultipartFile(
                             defaultCarImageEnum.name(), path.getFileName().toString(), "image/jpeg", Files.readAllBytes(path));
@@ -295,11 +286,7 @@ public class SeedDataConfig implements CommandLineRunner {
                 progress.setExtraMessage("Creating default users...");
                 for (DefaultUserImage defaultUserImageEnum : DefaultUserImage.getAll()) {
                     URL url = new URL(defaultUserImageEnum.getUrl());
-                    Path path = Paths.get("src/main/resources/assets/default/user", defaultUserImageEnum.name() + ".jpg");
-                    if (Files.exists(path)) {
-                        Files.delete(path);
-                    }
-                    Files.copy(url.openStream(), path);
+                    Path path = downloadToTempJpg(url, "user_" + defaultUserImageEnum.name());
                     MultipartFile file = new MockMultipartFile(
                             defaultUserImageEnum.name(), path.getFileName().toString(), "image/jpeg", Files.readAllBytes(path));
 
@@ -438,6 +425,14 @@ public class SeedDataConfig implements CommandLineRunner {
             progress.close();
             isRunning = false;
         }
+    }
+
+    private Path downloadToTempJpg(URL url, String prefix) throws IOException {
+        Path tmpFile = Files.createTempFile(prefix + "_", ".jpg");
+        try (InputStream in = url.openStream()) {
+            Files.copy(in, tmpFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        return tmpFile;
     }
 }
 
