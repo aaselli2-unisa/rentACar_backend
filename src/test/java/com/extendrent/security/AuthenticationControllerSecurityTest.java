@@ -20,6 +20,7 @@ import src.service.auth.AuthenticationService;
 import src.service.external.EmailService;
 import src.service.user.UserService;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -56,12 +57,12 @@ class AuthenticationControllerSecurityTest {
     class SignupValidation {
 
         @Test
-        @DisplayName("Valid CUSTOMER signup payload is accepted (no 400)")
+        @DisplayName("Valid CUSTOMER signup payload is accepted (2xx)")
         void validCustomerSignup_isAccepted() throws Exception {
             mockMvc.perform(post("/api/v1/auth/signup")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(validCustomerJson()))
-                    .andExpect(status().is(not(400)));
+                    .andExpect(status().is2xxSuccessful());
         }
 
         @Test
@@ -148,11 +149,12 @@ class AuthenticationControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("VULNERABILITY: ADMIN role can be requested through the public signup endpoint")
-        void publicEndpoint_acceptsAdminRoleSignup_documentsEscalationRisk() throws Exception {
-            // Any unauthenticated caller can request ADMIN authority during signup.
-            // The application MUST validate that only ADMIN-initiated flows may create ADMIN users.
-            // This test documents the missing server-side role restriction.
+        @DisplayName("PATCHED V02: signup with ADMIN authority returns 400 Bad Request")
+        void adminRoleSignup_isRejectedWithBadRequest() throws Exception {
+            // Security patch V02: @AssertTrue on isAuthorityCustomer() ensures only CUSTOMER
+            // is accepted. Sending ADMIN triggers a MethodArgumentNotValidException → 400.
+            // This is a regression guard for V02 — if the @AssertTrue annotation is removed,
+            // this test turns red immediately.
             mockMvc.perform(post("/api/v1/auth/signup")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
@@ -160,8 +162,7 @@ class AuthenticationControllerSecurityTest {
                                     "password":"12345678","phoneNumber":"5551234567",
                                     "authority":"ADMIN","userImageEntityId":1,
                                     "salary":999999.0}"""))
-                    .andExpect(status().is(not(401))) // no access control blocks this
-                    .andExpect(status().is(not(403)));
+                    .andExpect(status().isBadRequest());
         }
 
         @ParameterizedTest(name = "XSS payload in name: {0}")
@@ -181,15 +182,16 @@ class AuthenticationControllerSecurityTest {
             mockMvc.perform(post("/api/v1/auth/signup")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))
-                    // Response must not echo the raw script tag in a 200 body
+                    // XSS payloads must not be reflected unescaped regardless of status code.
+                    // Validation error bodies (400) must not echo the field value back.
                     .andExpect(result -> {
                         String body = result.getResponse().getContentAsString();
-                        // Either the request is rejected (4xx) or the payload is not reflected raw
-                        int status = result.getResponse().getStatus();
-                        if (status == 200 || status == 204) {
-                            org.assertj.core.api.Assertions.assertThat(body)
-                                    .doesNotContain("<script>");
-                        }
+                        org.assertj.core.api.Assertions.assertThat(body)
+                                .as("XSS payload must not be reflected unescaped in response body "
+                                        + "(status: %d)", result.getResponse().getStatus())
+                                .doesNotContain("<script>")
+                                .doesNotContain("onerror=")
+                                .doesNotContain("javascript:");
                     });
         }
     }
@@ -258,44 +260,56 @@ class AuthenticationControllerSecurityTest {
     }
 
     // ======================================================================
-    //  GET /api/v1/auth/isUserTrue – credential exposure vulnerability
+    //  POST /api/v1/auth/isUserTrue – V01 security patch verification
+    //  Credentials moved from query parameters to request body.
     // ======================================================================
 
     @Nested
-    @DisplayName("VULNERABILITY – GET /api/v1/auth/isUserTrue exposes credentials in URL")
-    class IsUserTrueVulnerability {
+    @DisplayName("V01 patch – POST /api/v1/auth/isUserTrue (credentials in body, not URL)")
+    class IsUserTruePatch {
 
         @Test
-        @DisplayName("Endpoint is reachable without authentication (included in whitelist)")
-        void endpoint_isPubliclyAccessible() throws Exception {
-            mockMvc.perform(get("/api/v1/auth/isUserTrue")
+        @DisplayName("GET /api/v1/auth/isUserTrue is blocked (old query-param endpoint removed)")
+        void oldGet_withQueryParams_isBlocked() throws Exception {
+            // Security patch V01: the GET mapping was removed.
+            // Spring Security may return 401 before the dispatcher can return 405 —
+            // both are acceptable since the request does not succeed.
+            int status = mockMvc.perform(get("/api/v1/auth/isUserTrue")
                             .param("email", "admin@example.com")
                             .param("password", "secret"))
-                    .andExpect(status().is(not(401)));
+                    .andReturn().getResponse().getStatus();
+            assertThat(status).as("GET /api/v1/auth/isUserTrue must not return 200").isNotEqualTo(200);
+            assertThat(status).as("Expected 401 or 405, got " + status)
+                    .isIn(401, 405);
         }
 
         @Test
-        @DisplayName("Credentials are transmitted as query parameters – documented as CRITICAL risk")
-        void credentials_inQueryParams_areVisibleInLogs() throws Exception {
-            // Query parameters appear in server logs, browser history, Referer headers,
-            // and load-balancer access logs. This endpoint must be replaced with a POST
-            // that accepts credentials in the request body.
-            //
-            // This test simply asserts the endpoint maps to a GET, confirming the design flaw.
-            mockMvc.perform(get("/api/v1/auth/isUserTrue")
-                            .param("email", "victim@example.com")
-                            .param("password", "hunter2"))
-                    // If the endpoint is removed/replaced with POST this will return 405, which is
-                    // the desired state. Currently it returns 200 or service-layer error.
-                    .andExpect(status().is(not(405))); // currently still a GET
+        @DisplayName("POST /api/v1/auth/isUserTrue with JSON body is accepted (password in body, not URL)")
+        void newPost_withJsonBody_isAccepted() throws Exception {
+            // Security patch V01: POST with request body — password never appears in URL.
+            mockMvc.perform(post("/api/v1/auth/isUserTrue")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"user@example.com\",\"password\":\"secret\"}"))
+                    .andExpect(status().is(not(405)))
+                    .andExpect(status().is(not(400)));
         }
 
         @Test
-        @DisplayName("Missing email parameter returns 400 Bad Request, not 500")
-        void missingEmailParam_returns400NotInternalError() throws Exception {
-            mockMvc.perform(get("/api/v1/auth/isUserTrue")
-                            .param("password", "secret"))
-                    .andExpect(status().is(not(500)));
+        @DisplayName("POST /api/v1/auth/isUserTrue with missing password returns 400 Bad Request")
+        void missingPassword_returns400() throws Exception {
+            mockMvc.perform(post("/api/v1/auth/isUserTrue")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"user@example.com\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/auth/isUserTrue with empty body returns 400 Bad Request")
+        void emptyBody_returns400() throws Exception {
+            mockMvc.perform(post("/api/v1/auth/isUserTrue")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isBadRequest());
         }
     }
 

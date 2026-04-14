@@ -1,6 +1,7 @@
 package src.controller.auth.authentication.request;
 
 import jakarta.validation.constraints.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -45,6 +46,16 @@ public class SignUpReqeust {
 
     @NotNull
     UserRole authority;
+
+    /**
+     * Security patch V02 — only CUSTOMER role is allowed through the public signup endpoint.
+     * ADMIN and EMPLOYEE accounts must be created via the protected admin-only endpoints.
+     */
+    @AssertTrue(message = "Only CUSTOMER role is allowed for public signup")
+    @JsonIgnore
+    public boolean isAuthorityCustomer() {
+        return authority == UserRole.CUSTOMER;
+    }
 
     @NotNull
     int userImageEntityId;

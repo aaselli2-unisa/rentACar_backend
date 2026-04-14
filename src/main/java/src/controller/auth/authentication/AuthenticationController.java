@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import src.controller.TResponse;
+import src.controller.auth.authentication.request.IsUserTrueRequest;
 import src.controller.auth.authentication.request.SignInRequest;
 import src.controller.auth.authentication.request.SignUpReqeust;
 import src.core.security.model.JwtToken;
@@ -41,14 +42,16 @@ public class AuthenticationController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @GetMapping("/isUserTrue")
+    // Security patch V01: converted from GET+query-params to POST+body so the
+    // password is never written to server logs, browser history, or Referer headers.
+    @PostMapping("/isUserTrue")
     public ResponseEntity<TResponse<Boolean>> isCustomerTrue(
-            @RequestParam String email, @RequestParam String password) {
-        log.info(CHECKING_USER_CREDENTIALS, email);
+            @Valid @RequestBody IsUserTrueRequest request) {
+        log.info(CHECKING_USER_CREDENTIALS, request.getEmail());
         TResponse<Boolean> response = TResponse.<Boolean>tResponseBuilder()
-                .response(authenticationService.isUserTrue(email, password))
+                .response(authenticationService.isUserTrue(request.getEmail(), request.getPassword()))
                 .build();
-        log.info(USER_CREDENTIALS_CHECKED, email);
+        log.info(USER_CREDENTIALS_CHECKED, request.getEmail());
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 }
