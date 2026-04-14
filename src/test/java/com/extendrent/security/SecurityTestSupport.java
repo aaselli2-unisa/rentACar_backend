@@ -34,11 +34,6 @@ public final class SecurityTestSupport {
             "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
     public static final long JWT_EXPIRATION_MS = 86_400_000L;
 
-    // Sentinel value used as Bearer token in MockMvc requests
-    public static final String VALID_TOKEN_SENTINEL  = "mock-valid-token";
-    public static final String INVALID_TOKEN_SENTINEL = "mock-invalid-token";
-    public static final String EXPIRED_TOKEN_SENTINEL = "mock-expired-token";
-
     private SecurityTestSupport() {}
 
     // -----------------------------------------------------------------------
@@ -106,11 +101,4 @@ public final class SecurityTestSupport {
         when(userService.loadUserByUsername(user.getEmailAddress())).thenReturn(user);
     }
 
-    /**
-     * Configure the mocks so that any unknown token is treated as invalid
-     * (extractUsername returns null).
-     */
-    public static void setupInvalidTokenMock(JwtService jwtService, String token) {
-        when(jwtService.extractUsername(token)).thenReturn(null);
-    }
 }
