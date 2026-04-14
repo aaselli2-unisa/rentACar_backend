@@ -21,8 +21,12 @@ import java.util.function.Function;
 public class JwtService {
     @Value("${application.security.jwt.secret-key}")
     private String secretKey;
+    /** Access token TTL — keep short (≤ 1 hour in production). */
     @Value("${application.security.jwt.expiration}")
     private long expiration;
+    /** Refresh token TTL — must be significantly longer than access token (7–30 days). Security patch V09. */
+    @Value("${application.security.jwt.refresh-expiration}")
+    private long refreshExpiration;
 
     public String generateToken(UserEntity user) {
         Map<String, Object> customClaims = new HashMap<>(Map.of(
@@ -51,9 +55,10 @@ public class JwtService {
         Map<String, Object> refreshTokenClaims = new HashMap<>();
         refreshTokenClaims.put("userId", user.getId());
 
+        // Security patch V09: use refreshExpiration (7 days) instead of the access-token expiration.
         return Jwts.builder()
                 .setClaims(refreshTokenClaims)
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setExpiration(new Date(System.currentTimeMillis() + refreshExpiration))
                 .signWith(getSigninKey(), SignatureAlgorithm.HS256)
                 .compact();
     }

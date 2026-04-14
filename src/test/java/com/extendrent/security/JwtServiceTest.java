@@ -52,8 +52,11 @@ class JwtServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         jwtService = new JwtService();
-        injectField("secretKey", VALID_SECRET);
-        injectField("expiration", EXPIRATION_MS);
+        injectField("secretKey",         VALID_SECRET);
+        injectField("expiration",        EXPIRATION_MS);
+        // Security patch V09: JwtService now has a separate refreshExpiration field.
+        // Use 7 days so refresh tokens are not immediately expired during tests.
+        injectField("refreshExpiration", EXPIRATION_MS * 7);
     }
 
     // ---- helpers ----------------------------------------------------------
@@ -141,20 +144,22 @@ class JwtServiceTest {
         }
 
         @Test
-        @DisplayName("SECURITY GAP: Refresh token uses the same expiration as the access token")
-        void refreshToken_sameExpirationAsAccessToken() {
-            // Documents a design weakness: refresh and access tokens expire at the same time,
-            // making the refresh mechanism useless as a long-lived credential.
+        @DisplayName("REGRESSION V09: Refresh token must have a significantly longer TTL than access token")
+        void refreshToken_hasLongerExpirationThanAccessToken() {
+            // Security patch V09: JwtService now uses refreshExpiration (7 days) for refresh tokens
+            // vs expiration (1 hour) for access tokens. The two-token security model is restored.
             UserEntity user = buildUser("dave@example.com", UserRole.CUSTOMER);
-            String accessToken = jwtService.generateToken(user);
+            String accessToken  = jwtService.generateToken(user);
             String refreshToken = jwtService.generateRefreshToken(user);
 
-            Date accessExpiry = jwtService.extractExpiration(accessToken);
+            Date accessExpiry  = jwtService.extractExpiration(accessToken);
             Date refreshExpiry = jwtService.extractExpiration(refreshToken);
 
-            long delta = Math.abs(accessExpiry.getTime() - refreshExpiry.getTime());
-            // Both tokens expire within a few milliseconds of each other — same window.
-            assertThat(delta).isLessThan(1_000);
+            long delta = refreshExpiry.getTime() - accessExpiry.getTime();
+            // Refresh token must expire substantially after the access token.
+            assertThat(delta)
+                    .as("Refresh token expiry must be > access token expiry (delta: %d ms)", delta)
+                    .isGreaterThan(1_000);
         }
 
         @Test
@@ -223,6 +228,21 @@ class JwtServiceTest {
         @DisplayName("isTokenExpired returns true for an expired token")
         void expiredToken_isExpired() {
             assertThat(jwtService.isTokenExpired(expiredToken("jack@example.com"))).isTrue();
+        }
+
+        @Test
+        @DisplayName("Refresh token rejected by isTokenValid – no subject means username never matches")
+        void refreshToken_rejectedByIsTokenValid() {
+            // Refresh tokens intentionally omit the subject (email) — see refreshToken_hasNoSubject.
+            // isTokenValid() compares extractUsername(token) to userDetails.getUsername().
+            // With no subject, extractUsername returns null → comparison fails → must return false.
+            // This prevents a refresh token from being accepted as an access token at the JWT layer.
+            UserEntity user = buildUser("nosubject@example.com", UserRole.CUSTOMER);
+            String refreshToken = jwtService.generateRefreshToken(user);
+            assertThat(jwtService.isTokenValid(refreshToken, user))
+                    .as("Refresh token must be rejected by isTokenValid – it has no subject so"
+                            + " username matching must fail")
+                    .isFalse();
         }
     }
 

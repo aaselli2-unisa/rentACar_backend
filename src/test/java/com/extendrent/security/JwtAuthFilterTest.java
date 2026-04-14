@@ -123,8 +123,12 @@ class JwtAuthFilterTest {
     class ValidJwt {
 
         @Test
-        @DisplayName("Valid token causes filter to set authentication in SecurityContext")
-        void validToken_setsAuthentication() throws Exception {
+        @DisplayName("Valid token is processed by the filter without crashing (filter does not return 500)")
+        void validToken_doesNotCrashFilter() throws Exception {
+            // This test verifies filter resilience: when extractUsername and isTokenValid
+            // both succeed, the filter must not throw or produce a 500.
+            // Authentication propagation to SecurityContext is verified indirectly
+            // by the role-access tests in SecurityFilterChainTest and UserControllerSecurityTest.
             UserEntity user = buildActiveUser("user@example.com", UserRole.CUSTOMER);
             String token = SecurityTestSupport.validJwt("user@example.com", UserRole.CUSTOMER);
 
@@ -132,8 +136,6 @@ class JwtAuthFilterTest {
             when(jwtService.isTokenValid(eq(token), any())).thenReturn(true);
             when(userService.loadUserByUsername("user@example.com")).thenReturn(user);
 
-            // The public /signin endpoint is used so we can observe filter behaviour
-            // even before access control is fixed. The filter should not throw.
             mockMvc.perform(post("/api/v1/auth/signin")
                             .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                             .content("{\"email\":\"user@example.com\",\"password\":\"password\"}")
