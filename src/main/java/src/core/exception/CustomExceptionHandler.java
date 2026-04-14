@@ -31,9 +31,12 @@ public class CustomExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public TResponse<?> handleException(Exception e) {
+        // Security patch V08: raw e.getMessage() replaced with a generic string.
+        // The full exception (with stack trace and DB details) is kept in the server log only.
         log(ERROR_GENERIC_EXCEPTION, e);
         return TResponse.tResponseBuilder()
-                .response(new ErrorResponse(NotFoundExceptionType.GENERIC_EXCEPTION, Collections.singletonList(e.getMessage())))
+                .response(new ErrorResponse(NotFoundExceptionType.GENERIC_EXCEPTION,
+                        Collections.singletonList("An internal error occurred. Please contact support.")))
                 .build();
     }
 
