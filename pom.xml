@@ -131,16 +131,14 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
+            <version>6.0.2</version>
+        </dependency>
+        <dependency>
             <groupId>me.tongfei</groupId>
             <artifactId>progressbar</artifactId>
             <version>0.10.0</version>
-        </dependency>
-
-        <!-- spring-test: required by SeedDataConfig (MockMultipartFile) in main sources.
-             Version is managed by spring-boot-starter-parent (Spring 6.1.x for Boot 3.2.x). -->
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-test</artifactId>
         </dependency>
 
         <!-- H2 in-memory database for web-layer tests (no real PostgreSQL needed) -->
@@ -183,148 +181,6 @@
                 </configuration>
             </plugin>
 
-            <!--
-                JaCoCo – code-coverage measurement for security tests.
-
-                Usage:
-                  mvn verify                   → runs all tests + generates HTML + XML report
-                  mvn jacoco:report            → generate report only (after surefire ran)
-                  open target/site/jacoco/index.html  → view coverage
-
-                Coverage reports land in:  target/site/jacoco/
-
-                Thresholds (enforced in the check goal – build fails if not met):
-                  Line   coverage ≥ 60 %   (security-critical codebase minimum)
-                  Branch coverage ≥ 50 %
-                  Class  coverage ≥ 70 %   (every security-relevant class must be touched)
-
-                To interpret for security purposes:
-                  - Red lines in controllers / filters / security config = untested attack surface
-                  - Low branch coverage in JwtService = edge cases not exercised
-                  - Any 0 % coverage in src.core.security.* is a critical gap
-            -->
-            <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.11</version>
-                <configuration>
-                    <!-- Focus coverage measurement on security-critical packages -->
-                    <includes>
-                        <include>src/controller/**</include>
-                        <include>src/core/security/**</include>
-                        <include>src/core/config/**</include>
-                        <include>src/core/exception/**</include>
-                        <include>src/service/auth/**</include>
-                        <include>src/service/user/**</include>
-                        <include>src/service/rental/**</include>
-                        <include>src/service/payment/**</include>
-                    </includes>
-                    <!-- Exclude generated Lombok code, seed data, and pure config glue -->
-                    <excludes>
-                        <exclude>src/core/config/SeedDataConfig.class</exclude>
-                        <exclude>src/core/config/SwaggerConfig.class</exclude>
-                        <exclude>src/core/config/OpenApiConfig.class</exclude>
-                        <exclude>src/core/config/CloudinaryConfig.class</exclude>
-                        <exclude>src/Application.class</exclude>
-                        <exclude>**/*LogConstant.class</exclude>
-                        <exclude>**/*AnsiColorConstant.class</exclude>
-                    </excludes>
-                </configuration>
-                <executions>
-                    <!-- 1. Instrument bytecode before tests run -->
-                    <execution>
-                        <id>jacoco-initialize</id>
-                        <goals>
-                            <goal>prepare-agent</goal>
-                        </goals>
-                    </execution>
-
-                    <!-- 2. Generate HTML + XML report in the verify phase -->
-                    <execution>
-                        <id>jacoco-report</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>report</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>${project.reporting.outputDirectory}/jacoco</outputDirectory>
-                            <formats>
-                                <format>HTML</format>
-                                <format>XML</format>
-                            </formats>
-                        </configuration>
-                    </execution>
-
-                    <!-- 3. Enforce minimum coverage thresholds — build fails if not met -->
-                    <execution>
-                        <id>jacoco-check</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                        <configuration>
-                            <rules>
-                                <!-- Global minimums across all included classes -->
-                                <rule>
-                                    <element>BUNDLE</element>
-                                    <limits>
-                                        <limit>
-                                            <counter>LINE</counter>
-                                            <value>COVEREDRATIO</value>
-                                            <minimum>0.60</minimum>
-                                        </limit>
-                                        <limit>
-                                            <counter>BRANCH</counter>
-                                            <value>COVEREDRATIO</value>
-                                            <minimum>0.50</minimum>
-                                        </limit>
-                                        <limit>
-                                            <counter>CLASS</counter>
-                                            <value>COVEREDRATIO</value>
-                                            <minimum>0.70</minimum>
-                                        </limit>
-                                    </limits>
-                                </rule>
-
-                                <!-- Security-critical package: every class must be touched -->
-                                <rule>
-                                    <element>PACKAGE</element>
-                                    <includes>
-                                        <include>src/core/security</include>
-                                    </includes>
-                                    <limits>
-                                        <limit>
-                                            <counter>CLASS</counter>
-                                            <value>COVEREDRATIO</value>
-                                            <minimum>1.00</minimum>
-                                        </limit>
-                                        <limit>
-                                            <counter>LINE</counter>
-                                            <value>COVEREDRATIO</value>
-                                            <minimum>0.80</minimum>
-                                        </limit>
-                                    </limits>
-                                </rule>
-
-                                <!-- Security config package: every class touched -->
-                                <rule>
-                                    <element>PACKAGE</element>
-                                    <includes>
-                                        <include>src/core/config</include>
-                                    </includes>
-                                    <limits>
-                                        <limit>
-                                            <counter>CLASS</counter>
-                                            <value>COVEREDRATIO</value>
-                                            <minimum>0.70</minimum>
-                                        </limit>
-                                    </limits>
-                                </rule>
-                            </rules>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

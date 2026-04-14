@@ -1,0 +1,43 @@
+# =============================================================================
+# ISTRUZIONI DI SETUP
+# =============================================================================
+# 1. Copia questo file: cp application.properties.example application.properties
+# 2. Riempi tutti i campi contrassegnati con <...>
+# 3. Il file application.properties è nel .gitignore: non verrà mai committato
+# =============================================================================
+
+# --- DATABASE (PostgreSQL locale) ---
+spring.datasource.url=jdbc:postgresql://localhost:5432/<NOME_DATABASE>
+spring.datasource.username=postgres
+spring.datasource.password=<PASSWORD_POSTGRES>
+spring.jpa.hibernate.ddl-auto=update
+spring.sql.init.mode=always
+spring.jpa.defer-datasource-initialization=true
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# --- SERVER ---
+server.port=8080
+app.base-url=http://localhost:8080
+
+# --- JWT ---
+# Genera una chiave sicura con: openssl rand -hex 64
+application.security.jwt.secret-key=<JWT_SECRET_KEY>
+application.security.jwt.expiration=3600000
+application.security.jwt.refresh-expiration=604800000
+
+# --- CLOUDINARY (upload immagini) ---
+# Account gratuito su https://cloudinary.com
+cloudinary.cloud-name=<CLOUD_NAME>
+cloudinary.api-key=<API_KEY>
+cloudinary.api-secret=<API_SECRET>
+
+# --- EMAIL (Gmail SMTP) ---
+# Richiede una "App Password" Gmail (non la password normale):
+# Account Google → Sicurezza → Autenticazione a 2 fattori → Password per le app
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=<TUA_EMAIL@gmail.com>
+spring.mail.password=<GMAIL_APP_PASSWORD>
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
