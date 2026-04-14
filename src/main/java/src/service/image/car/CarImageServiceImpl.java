@@ -13,7 +13,9 @@ import src.service.image.ImageRules;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
+import static src.core.exception.type.FileExceptionType.INVALID_FILE_TYPE;
 import static src.core.exception.type.FileExceptionType.PHOTO_DELETE_FAILED;
 import static src.core.exception.type.FileExceptionType.PHOTO_UPLOAD_FAILED;
 import static src.core.exception.type.FileExceptionType.PHOTO_IS_EMPTY;
@@ -23,6 +25,13 @@ import static src.core.exception.type.NotFoundExceptionType.IMAGE_NOT_FOUND;
 @RequiredArgsConstructor
 public class CarImageServiceImpl implements CarImageService {
 
+    // Security patch V07: only JPEG, PNG and WebP content-types are accepted.
+    // We validate the declared Content-Type against this whitelist so that
+    // script files (HTML, PHP, JS) cannot be stored or served as images.
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "image/jpeg", "image/jpg", "image/png", "image/webp"
+    );
+
     private final CarImageRepository repository;
     private final ImageRules rules;
     private final CloudinaryServiceImpl cloudinaryServiceImpl;
@@ -31,6 +40,10 @@ public class CarImageServiceImpl implements CarImageService {
     public CarImageEntity create(MultipartFile file, String licensePlate) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new FileException(PHOTO_IS_EMPTY);
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
+            throw new FileException(INVALID_FILE_TYPE);
         }
         try {
             byte[] newByte = ImageUtils.resizeImage(file.getBytes(), 1920, 1080);
