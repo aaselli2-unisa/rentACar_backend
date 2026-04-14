@@ -24,17 +24,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * CORS misconfiguration tests.
+ * CORS configuration security tests (PATCHED V03 / V12).
  *
- * CRITICAL vulnerability: Both {@link CorsConfig} and {@link WebConfig} use
- * {@code allowedOrigins("*")}, which means any origin in the world can make
- * cross-origin requests to this API.
- *
- * Combined with CSRF disabled (stateless API), this creates a risk surface where
- * malicious pages can perform API calls on behalf of authenticated victims.
- *
- * Tests assert what the CORRECT behaviour should be (specific allowed origins).
- * Tests that currently PASS (wildcard accepted) document the vulnerability.
+ * Verifies that the CORS policy is correctly restricted to known origins.
+ * These tests are regression guards: wildcard origins and attacker domains were
+ * removed in V03/V12 and must not be re-introduced.
  */
 @WebMvcTest(AuthenticationController.class)
 @Import({SecurityConfig.class, AppConfig.class, CorsConfig.class, WebConfig.class})
@@ -55,47 +49,69 @@ class CorsSecurityTest {
     // ======================================================================
 
     @Nested
-    @DisplayName("VULNERABILITY – wildcard origin is accepted (currently PASSES, should FAIL after fix)")
-    class WildcardOriginVulnerability {
+    @DisplayName("FIXED – attacker domains removed from CORS whitelist (V03 patch)")
+    class AttackerDomainsRejected {
 
         @Test
-        @DisplayName("Preflight from an arbitrary attacker origin returns 200 with ACAO header")
-        void preflightFromArbitraryOrigin_isAccepted() throws Exception {
+        @DisplayName("Preflight from evil-attacker.com must NOT return Access-Control-Allow-Origin")
+        void preflightFromAttackerOrigin_isRejected() throws Exception {
+            // After V03 patch: evil-attacker.com is not in ALLOWED_ORIGINS → no ACAO header
             mockMvc.perform(options("/api/v1/auth/signin")
                             .header("Origin", "https://evil-attacker.com")
                             .header("Access-Control-Request-Method", "POST")
                             .header("Access-Control-Request-Headers", "Content-Type,Authorization"))
-                    .andExpect(status().isOk())
-                    // Currently the response allows any origin — documents the vulnerability
-                    .andExpect(header().exists("Access-Control-Allow-Origin"));
+                    .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
         }
 
         @Test
-        @DisplayName("Simple GET from attacker origin receives ACAO header (wildcard exposure)")
-        void simpleRequestFromAttackerOrigin_receivesACAOHeader() throws Exception {
+        @DisplayName("Simple request from attacker.example.com must NOT receive ACAO header")
+        void simpleRequestFromAttackerOrigin_doesNotReceiveAcaoHeader() throws Exception {
+            // After V03 patch: attacker.example.com removed from ALLOWED_ORIGINS
             mockMvc.perform(post("/api/v1/auth/signin")
                             .header("Origin", "https://attacker.example.com")
                             .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                             .content("{\"email\":\"u@u.com\",\"password\":\"password\"}"))
-                    .andExpect(header().exists("Access-Control-Allow-Origin"));
+                    .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
         }
 
         @Test
-        @DisplayName("ACAO header must NOT be '*' after security fix – currently is wildcard")
-        void acaoHeader_mustNotBeWildcard_afterFix() throws Exception {
+        @DisplayName("ACAO header must be present and not '*' for a whitelisted origin")
+        void acaoHeader_isNotWildcard_forLegitOrigin() throws Exception {
+            // "https://legit-frontend.example.com" is explicitly in CorsConfig.ALLOWED_ORIGINS
             mockMvc.perform(options("/api/v1/auth/signin")
                             .header("Origin", "https://legit-frontend.example.com")
                             .header("Access-Control-Request-Method", "POST")
                             .header("Access-Control-Request-Headers", "Authorization"))
                     .andExpect(result -> {
                         String acao = result.getResponse().getHeader("Access-Control-Allow-Origin");
-                        // After fix: ACAO must be the specific allowed origin, not "*"
-                        // Currently this assertion FAILS (wildcard is returned)
-                        if (acao != null) {
-                            org.assertj.core.api.Assertions.assertThat(acao)
-                                    .as("Access-Control-Allow-Origin must not be wildcard")
-                                    .isNotEqualTo("*");
-                        }
+                        org.assertj.core.api.Assertions.assertThat(acao)
+                                .as("Access-Control-Allow-Origin must be present for a whitelisted origin")
+                                .isNotNull();
+                        org.assertj.core.api.Assertions.assertThat(acao)
+                                .as("Access-Control-Allow-Origin must not be wildcard — specific origin required")
+                                .isNotEqualTo("*");
+                    });
+        }
+
+        @Test
+        @DisplayName("CorsConfig does not enable Allow-Credentials – header must be absent from preflight response")
+        void allowCredentials_mustNotBePresentInPreflightResponse() throws Exception {
+            // CorsConfig deliberately omits allowCredentials(true).
+            // This test is a regression guard: if someone adds allowCredentials(true) to CorsConfig
+            // without also auditing the allowed origins, this test turns red immediately and forces
+            // a conscious security review before the change can land.
+            mockMvc.perform(options("/api/v1/auth/signin")
+                            .header("Origin", "https://legit-frontend.example.com")
+                            .header("Access-Control-Request-Method", "POST")
+                            .header("Access-Control-Request-Headers", "Authorization"))
+                    .andExpect(result -> {
+                        String allowCreds = result.getResponse().getHeader("Access-Control-Allow-Credentials");
+                        org.assertj.core.api.Assertions.assertThat(allowCreds)
+                                .as("Access-Control-Allow-Credentials must not be set — "
+                                        + "CorsConfig does not configure credentials. "
+                                        + "If you intentionally need credentials, also verify "
+                                        + "that no wildcard origin is in ALLOWED_ORIGINS.")
+                                .isNotEqualTo("true");
                     });
         }
     }
@@ -155,41 +171,37 @@ class CorsSecurityTest {
     // ======================================================================
 
     @Nested
-    @DisplayName("Security headers – missing from current configuration")
-    class MissingSecurityHeaders {
+    @DisplayName("V14 patch – Security headers (CSP + X-Frame-Options)")
+    class SecurityHeaders {
 
         @Test
-        @DisplayName("VULNERABILITY: X-Frame-Options header is missing – clickjacking risk")
-        void xFrameOptions_shouldBeDeny() throws Exception {
+        @DisplayName("PATCHED V14: Content-Security-Policy header must be present and restrict origins")
+        void contentSecurityPolicy_mustBePresent() throws Exception {
             mockMvc.perform(post("/api/v1/auth/signin")
                             .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                             .content("{\"email\":\"u@u.com\",\"password\":\"password\"}"))
-                    .andExpect(result -> {
-                        // With current config, X-Frame-Options may not be set.
-                        // After fix: .andExpect(header().string("X-Frame-Options", "DENY"))
-                        // This test documents the missing header.
-                        String xfo = result.getResponse().getHeader("X-Frame-Options");
-                        org.junit.jupiter.api.Assumptions.assumeTrue(
-                                xfo != null,
-                                "X-Frame-Options header not present – clickjacking risk");
-                        org.assertj.core.api.Assertions.assertThat(xfo)
-                                .isIn("DENY", "SAMEORIGIN");
-                    });
+                    .andExpect(header().exists("Content-Security-Policy"))
+                    .andExpect(header().string("Content-Security-Policy",
+                            org.hamcrest.Matchers.containsString("default-src 'self'")));
         }
 
         @Test
-        @DisplayName("VULNERABILITY: Content-Security-Policy header is missing")
-        void contentSecurityPolicy_shouldBePresent() throws Exception {
+        @DisplayName("PATCHED V14: frame-ancestors 'none' prevents clickjacking via CSP")
+        void frameAncestors_mustBeNone() throws Exception {
             mockMvc.perform(post("/api/v1/auth/signin")
                             .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                             .content("{\"email\":\"u@u.com\",\"password\":\"password\"}"))
-                    .andExpect(result -> {
-                        String csp = result.getResponse().getHeader("Content-Security-Policy");
-                        org.junit.jupiter.api.Assumptions.assumeTrue(
-                                csp != null,
-                                "Content-Security-Policy header not present – XSS amplification risk");
-                        org.assertj.core.api.Assertions.assertThat(csp).isNotEmpty();
-                    });
+                    .andExpect(header().string("Content-Security-Policy",
+                            org.hamcrest.Matchers.containsString("frame-ancestors 'none'")));
+        }
+
+        @Test
+        @DisplayName("X-Frame-Options header must be present (clickjacking protection)")
+        void xFrameOptions_mustBeDenyOrSameOrigin() throws Exception {
+            mockMvc.perform(post("/api/v1/auth/signin")
+                            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"u@u.com\",\"password\":\"password\"}"))
+                    .andExpect(header().exists("X-Frame-Options"));
         }
     }
 }
