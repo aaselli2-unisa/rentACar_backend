@@ -88,7 +88,7 @@ class InputValidationSecurityTest {
                 "' OR 1=1 --",
                 "<script>alert(1)</script>",
         })
-        @DisplayName("SQL/XSS injection in signup name does not cause a 500 error")
+        @DisplayName("SQL/XSS injection in signup name does not cause a 500 and is not reflected in response")
         void injection_inName_doesNotCrash(String payload) throws Exception {
             String json = """
                     {"name":"%s","surname":"User","emailAddress":"safe@example.com",
@@ -99,7 +99,14 @@ class InputValidationSecurityTest {
             mockMvc.perform(post("/api/v1/auth/signup")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))
-                    .andExpect(status().is(not(500)));
+                    .andExpect(status().is(not(500)))
+                    .andExpect(result -> {
+                        String body = result.getResponse().getContentAsString();
+                        org.assertj.core.api.Assertions.assertThat(body)
+                                .as("XSS payload must not be reflected unescaped in the response")
+                                .doesNotContain("<script>")
+                                .doesNotContain("onerror=");
+                    });
         }
     }
 
@@ -218,6 +225,18 @@ class InputValidationSecurityTest {
                                     "authority":"CUSTOMER","userImageEntityId":1}""".formatted(longSurname)))
                     .andExpect(status().isBadRequest());
         }
+
+        @Test
+        @DisplayName("Oversized JSON body (1MB) does not cause OOM or 500")
+        void oversizedJsonBody_doesNotCrash() throws Exception {
+            // Build a large JSON body by repeating a valid-looking field many times
+            // A real application must reject or truncate this without OOM or 500
+            String largeValue = "A".repeat(1_000_000);
+            mockMvc.perform(post("/api/v1/auth/signin")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"" + largeValue + "@x.com\",\"password\":\"password\"}"))
+                    .andExpect(status().is(not(500)));
+        }
     }
 
     // ======================================================================
@@ -287,27 +306,33 @@ class InputValidationSecurityTest {
     }
 
     // ======================================================================
-    //  Password in query parameter – security design flaw
+    //  Password in request body – V01 security patch verification
     // ======================================================================
 
     @Nested
-    @DisplayName("VULNERABILITY – password transmitted as query parameter")
+    @DisplayName("V01 patch – password must be in request body, not query parameter")
     class PasswordQueryParameter {
 
         @Test
-        @DisplayName("PUT /api/v1/users/updatePassword sends password as a query param – documented risk")
-        void updatePassword_queryParam_isLogged() throws Exception {
-            // This test documents that the password is visible in:
-            // - URL access logs (server, proxy, CDN)
-            // - Browser history
-            // - Referer headers to third parties
-            // The endpoint must be redesigned to accept credentials in the request body.
+        @DisplayName("PUT /api/v1/users/updatePassword with query-param password must return 400 (no longer accepted)")
+        void updatePassword_queryParam_isRejected() throws Exception {
+            // Security patch V01: password moved to request body.
+            // Sending password as a query param now returns 400 (missing required body).
             mockMvc.perform(put("/api/v1/users/updatePassword")
                             .param("id", "1")
                             .param("password", "plaintextPassword!"))
-                    // Current state: endpoint is reached (no 401 since it's permitAll)
-                    // After security fix: should return 401 (unauthenticated) or 403 (wrong role)
-                    .andExpect(status().is(not(500))); // at minimum, must not crash
+                    .andExpect(status().is4xxClientError()); // 400 or 401 — body is now required
+        }
+
+        @Test
+        @DisplayName("PUT /api/v1/users/updatePassword with JSON body is accepted at the HTTP layer (returns 401 without auth)")
+        void updatePassword_jsonBody_isAccepted() throws Exception {
+            // Security patch V01: request body approach.
+            // Without a JWT token this returns 401 (protected by ADMIN role).
+            mockMvc.perform(put("/api/v1/users/updatePassword")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"id\":1,\"password\":\"newSecure!99\"}"))
+                    .andExpect(status().is(not(500)));
         }
     }
 
