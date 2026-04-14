@@ -17,6 +17,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import src.core.security.JwtAuthFilter;
+import src.core.security.RateLimitFilter;
 
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
@@ -26,18 +27,19 @@ import static org.springframework.security.config.Customizer.withDefaults;
 @AllArgsConstructor
 public class SecurityConfig {
 
+    // Security patch V13: Swagger and API-docs paths removed from the public whitelist.
+    // They are placed under authenticated() below so any logged-in user can use them.
+    // In production, consider restricting further to hasRole("ADMIN") or disabling entirely
+    // via @Profile("!prod") on OpenApiConfig/SwaggerConfig.
+    // The Azure URL entry (/extendrent.azurewebsites.net/...) has also been removed — its
+    // purpose was undocumented and it created an unusual literal path match.
     private static final String[] DEFAULT_WHITE_LIST_URLS = {
-            "/swagger-ui/**",
-            "/v2/api-docs",
-            "/v3/api-docs",
-            "/v3/api-docs/**",
-            "/api/auth/**",
-            "/swagger-ui.html",
-            "/extendrent.azurewebsites.net/api/v1/**"
+            "/api/auth/**"
     };
 
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final RateLimitFilter rateLimitFilter;
     private final PasswordEncoder passwordEncoder;
     private final UserDetailsService userService;
 
@@ -52,9 +54,13 @@ public class SecurityConfig {
                 .authorizeHttpRequests((req) -> req
                         .requestMatchers(DEFAULT_WHITE_LIST_URLS).permitAll()
 
+                        // Security patch V13: Swagger / OpenAPI paths require authentication.
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html",
+                                "/v2/api-docs", "/v3/api-docs", "/v3/api-docs/**").authenticated()
+
                         // Public authentication/verification endpoints
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/signup", "/api/v1/auth/signin").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/isUserTrue").permitAll()
+                        // Security patch V01: isUserTrue converted to POST (password moved to body)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/signup", "/api/v1/auth/signin", "/api/v1/auth/isUserTrue").permitAll()
                         .requestMatchers("/api/v1/verify/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/refresh-token/**").permitAll()
 
@@ -90,8 +96,16 @@ public class SecurityConfig {
                                 response.sendError(FORBIDDEN.value(), FORBIDDEN.getReasonPhrase()))
                 )
                 .authenticationProvider(authenticationProvider())
+                // Security patch V06: rate limiting runs before JWT auth on all auth endpoints
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Security patch V14: add Content-Security-Policy header (OWASP A05 / CWE-693).
+                // Restricts resource loading to same origin; frame-ancestors 'none' prevents clickjacking.
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'self'; frame-ancestors 'none'"))
+                );
         return http.build();
     }
 
