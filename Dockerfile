@@ -11,6 +11,11 @@ RUN mvn -B -DskipTests clean package
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 
+# Installa curl per healthcheck (richiede root, prima di switchare utente)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Esegui come utente non-root (container hardening)
 RUN useradd --create-home --uid 10001 appuser
 USER appuser
@@ -20,9 +25,8 @@ COPY --from=build --chown=appuser:appuser /workspace/target/*.jar /app/app.jar
 
 EXPOSE 8080
 
-# Health check: verifica che la porta 8080 sia raggiungibile
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD bash -c 'echo > /dev/tcp/localhost/8080' || exit 1
+# Health check tramite Spring Actuator (più affidabile del TCP trick)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
-

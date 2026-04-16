@@ -34,7 +34,8 @@ public class SecurityConfig {
     // The Azure URL entry (/extendrent.azurewebsites.net/...) has also been removed — its
     // purpose was undocumented and it created an unusual literal path match.
     private static final String[] DEFAULT_WHITE_LIST_URLS = {
-            "/api/auth/**"
+            "/api/auth/**",
+            "/actuator/health"   // Docker/orchestrator healthcheck — no auth required
     };
 
 

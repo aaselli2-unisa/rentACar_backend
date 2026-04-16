@@ -168,6 +168,12 @@
             <artifactId>bucket4j-core</artifactId>
             <version>8.0.1</version>
         </dependency>
+
+        <!-- Actuator – exposes /actuator/health for Docker healthcheck -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
