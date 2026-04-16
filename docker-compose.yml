@@ -22,6 +22,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    networks:
+      - rentacar-net
 
   app:
     build:
@@ -37,8 +39,10 @@ services:
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/rentacar
       SPRING_PROFILES_ACTIVE: docker
-    ports:
-      - "8080:8080"
+    # Porta non esposta all'host: il frontend nginx fa da reverse proxy internamente.
+    # Decommentare SOLO per debug diretto dell'API.
+    # ports:
+    #   - "8080:8080"
     secrets:
       - DB_PASSWORD
       - JWT_SECRET
@@ -48,11 +52,37 @@ services:
       - MAIL_USERNAME
       - MAIL_PASSWORD
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080' || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
       timeout: 5s
-      start_period: 60s
+      start_period: 90s
       retries: 3
+    networks:
+      - rentacar-net
+
+  frontend:
+    build:
+      context: ../rent-a-car-frontend-project
+      dockerfile: Dockerfile
+    container_name: rentacar-frontend
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    networks:
+      - rentacar-net
+
+networks:
+  rentacar-net:
+    driver: bridge
 
 volumes:
   pgdata:
@@ -72,5 +102,3 @@ secrets:
     file: ./secrets/MAIL_USERNAME
   MAIL_PASSWORD:
     file: ./secrets/MAIL_PASSWORD
-
-
