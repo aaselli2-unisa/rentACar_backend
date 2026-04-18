@@ -2,6 +2,7 @@ package src.core.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
@@ -27,6 +28,10 @@ import static src.core.exception.ErrorLogConstant.*;
 public class CustomExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(CustomExceptionHandler.class);
+
+    // V-06: expose field-level validation details only in non-production environments
+    @Value("${app.expose-validation-details:false}")
+    private boolean exposeValidationDetails;
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -151,7 +156,12 @@ public class CustomExceptionHandler {
 
         log(ERROR_VALIDATION, validationException);
         ErrorResponse errorResponse = new ErrorResponse(validationExceptionType, Collections.singletonList("Validation error"));
-        errorResponse.setDetails(validationErrors);
+
+        // V-06: field names leaked to clients allow enumeration of DTO structure;
+        // expose details only in dev (app.expose-validation-details=true)
+        errorResponse.setDetails(exposeValidationDetails
+                ? validationErrors
+                : Collections.singletonList("Validation error"));
 
         return TResponse.tResponseBuilder()
                 .response(errorResponse)
