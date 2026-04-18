@@ -133,7 +133,7 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-test</artifactId>
-            <version>6.0.2</version>
+            <!-- version managed by Spring Boot 3.2 BOM (Spring 6.1.x) — do NOT pin -->
         </dependency>
         <dependency>
             <groupId>me.tongfei</groupId>
@@ -173,6 +173,13 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- V-09: Caffeine cache for bounded TTL eviction in RateLimitFilter -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <!-- version managed by Spring Boot BOM -->
         </dependency>
     </dependencies>
 
