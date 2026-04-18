@@ -2,6 +2,8 @@ package src.service.auth;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -102,10 +104,55 @@ public class CustomAuthenticationServiceImpl implements AuthenticationService, A
     }
 
     @Override
+    @Transactional
     public boolean isUserTrue(String emailAddress, String password) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(emailAddress, password)
-        );
-        return authentication.isAuthenticated();
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(emailAddress, password)
+            );
+            // V-14: successful auth — reset failure counter
+            recordSuccessfulLogin(emailAddress);
+            return authentication.isAuthenticated();
+        } catch (BadCredentialsException e) {
+            // V-14: increment failure counter; lock after 5 attempts
+            recordFailedLogin(emailAddress);
+            throw e;
+        }
+        // LockedException propagates as-is — Spring Security handles the 401 response
+    }
+
+    // V-04: revoke all refresh tokens for the user (logout)
+    @Override
+    @Transactional
+    public void logout(String email) {
+        UserEntity user = userEntityService.getByEmailAddress(email);
+        refreshTokenEntityService.revokeAllForUser(user.getId());
+    }
+
+    // V-14: track failed attempts; lock account for 15 minutes after 5 failures
+    private void recordFailedLogin(String emailAddress) {
+        try {
+            UserEntity user = userEntityService.getByEmailAddress(emailAddress);
+            user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
+            if (user.getFailedLoginAttempts() >= 5) {
+                user.setLockedUntil(LocalDateTime.now().plusMinutes(15));
+            }
+            userEntityService.update(user);
+        } catch (Exception ignored) {
+            // Email not found — don't reveal existence via timing or error difference
+        }
+    }
+
+    private void recordSuccessfulLogin(String emailAddress) {
+        try {
+            UserEntity user = userEntityService.getByEmailAddress(emailAddress);
+            if (user.getFailedLoginAttempts() > 0 || user.getLockedUntil() != null) {
+                user.setFailedLoginAttempts(0);
+                user.setLockedUntil(null);
+                userEntityService.update(user);
+            }
+        } catch (Exception ignored) {
+            // Non-critical — don't fail login if reset fails
+        }
     }
 }

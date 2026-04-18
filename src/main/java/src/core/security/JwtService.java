@@ -28,15 +28,11 @@ public class JwtService {
     @Value("${application.security.jwt.refresh-expiration}")
     private long refreshExpiration;
 
+    // V-05: only id and role in claims — name/email/phone removed (PII in JWT payload is Base64, not encrypted)
     public String generateToken(UserEntity user) {
-        Map<String, Object> customClaims = new HashMap<>(Map.of(
-                "id", user.getId(),
-                "emailAddress", user.getEmailAddress(),
-                "firstname", user.getName(),
-                "lastname", user.getSurname(),
-                "phoneNumber", user.getPhoneNumber(),
-                "role", user.getAuthorities()
-        ));
+        Map<String, Object> customClaims = new HashMap<>();
+        customClaims.put("id", user.getId());
+        customClaims.put("role", user.getAuthorities());
         return generateToken(customClaims, user);
     }
 

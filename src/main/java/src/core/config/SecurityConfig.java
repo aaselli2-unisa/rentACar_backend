@@ -55,15 +55,17 @@ public class SecurityConfig {
                 .authorizeHttpRequests((req) -> req
                         .requestMatchers(DEFAULT_WHITE_LIST_URLS).permitAll()
 
-                        // Security patch V13: Swagger / OpenAPI paths require authentication.
+                        // V-13: Swagger restricted to ADMIN role — exposes full API map, not for end-users
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html",
-                                "/v2/api-docs", "/v3/api-docs", "/v3/api-docs/**").authenticated()
+                                "/v2/api-docs", "/v3/api-docs", "/v3/api-docs/**").hasRole("ADMIN")
 
                         // Public authentication/verification endpoints
                         // Security patch V01: isUserTrue converted to POST (password moved to body)
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/signup", "/api/v1/auth/signin", "/api/v1/auth/isUserTrue").permitAll()
                         .requestMatchers("/api/v1/verify/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/refresh-token/**").permitAll()
+                        // V-04: logout needs to be authenticated (revokes tokens for the calling user)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").authenticated()
 
                         // Security-sensitive areas protected by role
                         .requestMatchers("/api/v1/admins/**").hasRole("ADMIN")

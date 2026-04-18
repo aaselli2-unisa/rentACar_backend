@@ -10,4 +10,7 @@ public interface AuthenticationService {
     JwtToken signIn(SignInRequest request);
 
     boolean isUserTrue(String email, String password);
+
+    // V-04: revoke all refresh tokens for the authenticated user (logout)
+    void logout(String email);
 }
