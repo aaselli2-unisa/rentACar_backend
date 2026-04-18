@@ -20,6 +20,9 @@ import src.service.user.UserService;
 import src.service.user.model.DefaultUserStatus;
 import src.service.user.model.UserRole;
 
+import org.junit.jupiter.api.BeforeEach;
+import src.core.security.model.JwtToken;
+
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -56,6 +59,14 @@ class JwtAuthFilterTest {
     @MockBean private UserService userService;
     @MockBean private AuthenticationService authenticationService;
     @MockBean private EmailService emailService;
+
+    @BeforeEach
+    void stubSignIn() {
+        // V-02: signIn() now reads tokens.getToken()/getRefreshToken() to build cookies.
+        // Without this stub the mock returns null → NullPointerException → 500.
+        when(authenticationService.signIn(any()))
+                .thenReturn(JwtToken.builder().token("test-token").refreshToken("test-refresh").build());
+    }
 
     // ======================================================================
     //  No Authorization header

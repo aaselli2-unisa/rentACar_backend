@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The fix chosen for this project: application.properties is in .gitignore and never
  * committed, so credentials can be stored as direct values in the local file.
  * The security property that must hold is that the file is gitignored, not that it
- * uses env-var placeholders.
+ * uses .env-var placeholders.
  *
  * These tests verify:
  *  1. application.properties is listed in .gitignore (never committed)
@@ -79,9 +79,9 @@ class HardcodedCredentialsSecurityTest {
                     .as("JWT secret key must be at least 64 hex chars (32 bytes). Current: %d chars", hexKey.length())
                     .isGreaterThanOrEqualTo(64);
         } else if (!placeholderPattern.matcher(content).find()) {
-            // Key is neither valid hex nor an env-var placeholder — reject it
+            // Key is neither valid hex nor an .env-var placeholder — reject it
             org.assertj.core.api.Assertions.fail(
-                    "JWT secret key must be either a hex string (≥64 chars) or an env-var placeholder "
+                    "JWT secret key must be either a hex string (≥64 chars) or an .env-var placeholder "
                     + "(${...}). Current value does not match either format.");
         }
         // If value is a placeholder ${...}, the check is skipped (value resolved at runtime).

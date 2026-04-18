@@ -94,12 +94,12 @@ class CorsSecurityTest {
         }
 
         @Test
-        @DisplayName("CorsConfig does not enable Allow-Credentials – header must be absent from preflight response")
-        void allowCredentials_mustNotBePresentInPreflightResponse() throws Exception {
-            // CorsConfig deliberately omits allowCredentials(true).
-            // This test is a regression guard: if someone adds allowCredentials(true) to CorsConfig
-            // without also auditing the allowed origins, this test turns red immediately and forces
-            // a conscious security review before the change can land.
+        @DisplayName("V-02: Allow-Credentials is present and 'true' – HttpOnly cookies require credentials mode")
+        void allowCredentials_isPresentForWhitelistedOrigin() throws Exception {
+            // V-02 patch: CorsConfig now calls allowCredentials(true) so that HttpOnly cookies
+            // set by the server are sent back by the browser on subsequent requests.
+            // This is safe ONLY because ALLOWED_ORIGINS is an explicit whitelist with no wildcard —
+            // Spring rejects allowCredentials(true) + "*" at startup (IllegalArgumentException).
             mockMvc.perform(options("/api/v1/auth/signin")
                             .header("Origin", "https://legit-frontend.example.com")
                             .header("Access-Control-Request-Method", "POST")
@@ -107,11 +107,9 @@ class CorsSecurityTest {
                     .andExpect(result -> {
                         String allowCreds = result.getResponse().getHeader("Access-Control-Allow-Credentials");
                         org.assertj.core.api.Assertions.assertThat(allowCreds)
-                                .as("Access-Control-Allow-Credentials must not be set — "
-                                        + "CorsConfig does not configure credentials. "
-                                        + "If you intentionally need credentials, also verify "
-                                        + "that no wildcard origin is in ALLOWED_ORIGINS.")
-                                .isNotEqualTo("true");
+                                .as("Access-Control-Allow-Credentials must be 'true' for whitelisted origins "
+                                        + "— required for HttpOnly cookie delivery (V-02)")
+                                .isEqualTo("true");
                     });
         }
     }

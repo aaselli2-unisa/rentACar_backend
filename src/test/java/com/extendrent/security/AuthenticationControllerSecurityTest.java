@@ -336,7 +336,7 @@ class AuthenticationControllerSecurityTest {
     private static String validCustomerJson() {
         return """
                 {"name":"Alice","surname":"Smith","emailAddress":"alice@example.com",
-                "password":"Str0ngPass","phoneNumber":"5551234567",
+                "password":"Str0ng@Pass","phoneNumber":"5551234567",
                 "authority":"CUSTOMER","userImageEntityId":1}""";
     }
 }

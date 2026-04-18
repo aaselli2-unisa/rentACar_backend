@@ -121,16 +121,19 @@ class JwtServiceTest {
         }
 
         @Test
-        @DisplayName("Custom claims – emailAddress, role, firstname, lastname, phoneNumber – are present")
+        @DisplayName("V-05: JWT contains only id and role — no PII claims (emailAddress/firstname/lastname/phoneNumber removed)")
         void customClaims_arePresentInToken() {
             UserEntity user = buildUser("bob@example.com", UserRole.ADMIN);
             String token = jwtService.generateToken(user);
             Claims claims = jwtService.extractAllClaims(token);
-            assertThat(claims.get("emailAddress")).isEqualTo("bob@example.com");
-            assertThat(claims.get("firstname")).isEqualTo("Test");
-            assertThat(claims.get("lastname")).isEqualTo("User");
-            assertThat(claims.get("phoneNumber")).isEqualTo("5551234567");
+            // Required minimal claims
+            assertThat(claims.get("id")).isNotNull();
             assertThat(claims.get("role")).isNotNull();
+            // PII claims must NOT be present (V-05 fix)
+            assertThat(claims.get("emailAddress")).isNull();
+            assertThat(claims.get("firstname")).isNull();
+            assertThat(claims.get("lastname")).isNull();
+            assertThat(claims.get("phoneNumber")).isNull();
         }
 
         @Test
