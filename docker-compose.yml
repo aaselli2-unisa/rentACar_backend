@@ -70,7 +70,7 @@ services:
       app:
         condition: service_healthy
     ports:
-      - "80:80"
+      - "8080:80"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost/ || exit 1"]
       interval: 30s

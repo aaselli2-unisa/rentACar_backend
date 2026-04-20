@@ -87,6 +87,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/fuels/**").authenticated()
                         .requestMatchers("/api/v1/gearshifts/**").authenticated()
                         .requestMatchers("/api/v1/vehicle-statuses/**").authenticated()
+                        // GET drivingLicenseType is needed by the public signup form (dropdown)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/drivingLicenseType/**").permitAll()
                         .requestMatchers("/api/v1/drivingLicenseType/**").authenticated()
                         .requestMatchers("/api/v1/rentalStatuses/**").authenticated()
                         .requestMatchers("/api/v1/car-segments/**").authenticated()
