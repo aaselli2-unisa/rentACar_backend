@@ -81,7 +81,8 @@ jobs:
       - name: Set image output
         id: image-ref
         run: |
-          echo "image=ghcr.io/${{ github.repository }}:sha-${{ steps.vars.outputs.sha }}" >> "$GITHUB_OUTPUT"
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${REPO_LOWER}:sha-${{ steps.vars.outputs.sha }}" >> "$GITHUB_OUTPUT"
 
   # ── 2. Trivy – scansione CVE sull'immagine pushata ──────────────────────────
   # Scansiona l'immagine Docker appena pushata per vulnerabilità nei pacchetti
@@ -101,7 +102,7 @@ jobs:
       security-events: write   # necessario per upload SARIF al tab Security
     steps:
       - name: Scan image per CVE (CRITICAL + HIGH)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ${{ needs.docker-push.outputs.image }}
           format: sarif
