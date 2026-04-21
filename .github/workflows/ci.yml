@@ -50,7 +50,7 @@ jobs:
           cache: maven
 
       - name: Run security test suite
-        run: mvn -B test -Dspring.profiles.active=test -Dtest="com.extendrent.security.*" --no-transfer-progress
+        run: mvn -B test -Dspring.profiles.active=test -Dtest="*SecurityTest,JwtAuthFilterTest,JwtServiceTest,RateLimitingBehaviorTest,SecurityFilterChainTest" --no-transfer-progress
 
       - name: Upload security test results
         if: always()
