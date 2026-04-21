@@ -101,7 +101,7 @@ jobs:
       security-events: write   # necessario per upload SARIF al tab Security
     steps:
       - name: Scan image per CVE (CRITICAL + HIGH)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ${{ needs.docker-push.outputs.image }}
           format: sarif
