@@ -81,7 +81,8 @@ jobs:
       - name: Set image output
         id: image-ref
         run: |
-          echo "image=ghcr.io/${{ github.repository }}:sha-${{ steps.vars.outputs.sha }}" >> "$GITHUB_OUTPUT"
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${REPO_LOWER}:sha-${{ steps.vars.outputs.sha }}" >> "$GITHUB_OUTPUT"
 
   # ── 2. Trivy – scansione CVE sull'immagine pushata ──────────────────────────
   # Scansiona l'immagine Docker appena pushata per vulnerabilità nei pacchetti
