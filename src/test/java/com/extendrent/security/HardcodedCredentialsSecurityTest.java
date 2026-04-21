@@ -1,5 +1,6 @@
 package com.extendrent.security;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -48,6 +49,7 @@ class HardcodedCredentialsSecurityTest {
     @Test
     @DisplayName("application.properties must not contain original project DB password from git history (082df8b)")
     void applicationProperties_mustNotContainOriginalDbPassword() throws IOException {
+        Assumptions.assumeTrue(Files.exists(PROPS_PATH), "application.properties not present (gitignored on CI) — skipping");
         String content = Files.readString(PROPS_PATH);
         assertThat(content)
                 .as("DB password '123asd123' is publicly known from git history (commit 082df8b) — do not reuse it")
@@ -60,6 +62,7 @@ class HardcodedCredentialsSecurityTest {
     @Test
     @DisplayName("application.properties must not contain original Cloudinary secret from git history (082df8b)")
     void applicationProperties_mustNotContainOriginalCloudinarySecret() throws IOException {
+        Assumptions.assumeTrue(Files.exists(PROPS_PATH), "application.properties not present (gitignored on CI) — skipping");
         String content = Files.readString(PROPS_PATH);
         assertThat(content)
                 .as("Cloudinary API secret 'Hm05tc_JHUTTJJSoD5eyQNU_zTA' is publicly known from git history — do not reuse it")
@@ -69,6 +72,7 @@ class HardcodedCredentialsSecurityTest {
     @Test
     @DisplayName("JWT secret key must be at least 64 hex characters (32 bytes minimum)")
     void jwtSecretKey_mustHaveAdequateEntropy() throws IOException {
+        Assumptions.assumeTrue(Files.exists(PROPS_PATH), "application.properties not present (gitignored on CI) — skipping");
         String content = Files.readString(PROPS_PATH);
         Pattern hexPattern = Pattern.compile("jwt\\.secret-key=([0-9A-Fa-f]+)");
         Pattern placeholderPattern = Pattern.compile("jwt\\.secret-key=\\$\\{");
