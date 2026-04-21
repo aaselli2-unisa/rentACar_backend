@@ -51,7 +51,6 @@ jobs:
 
       - name: Run security test suite
         run: |
-<<<<<<< Updated upstream
           TESTS="AccountLockoutSecurityTest,\
           AdminControllerSecurityTest,\
           AuthenticationControllerSecurityTest,\
@@ -87,11 +86,10 @@ jobs:
           mvn -B surefire:test \
             -Dspring.profiles.active=test \
             -Dtest="$TESTS" \
-=======
           mvn -B surefire:test \
             -Dspring.profiles.active=test \
             -Dtest="com.extendrent.security.*" \
->>>>>>> Stashed changes
+
             --no-transfer-progress
 
       - name: Upload security test results
@@ -134,11 +132,8 @@ jobs:
         with:
           project: rentACar-backend
           path: .
-<<<<<<< Updated upstream
-          format: 'SARIF HTML'   # SARIF per GitHub Security tab; HTML per lettura umana
-=======
+
           format: 'ALL'
->>>>>>> Stashed changes
           args: >-
             --suppression .github/owasp-suppressions.xml
             --failOnCVSS 3
