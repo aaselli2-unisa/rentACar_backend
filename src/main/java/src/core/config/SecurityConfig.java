@@ -1,6 +1,8 @@
 package src.core.config;
 
 import lombok.AllArgsConstructor;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
+import org.springframework.boot.actuate.health.HealthEndpoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -34,8 +36,7 @@ public class SecurityConfig {
     // The Azure URL entry (/extendrent.azurewebsites.net/...) has also been removed — its
     // purpose was undocumented and it created an unusual literal path match.
     private static final String[] DEFAULT_WHITE_LIST_URLS = {
-            "/api/auth/**",
-            "/actuator/health"   // Docker/orchestrator healthcheck — no auth required
+            "/api/auth/**"
     };
 
 
@@ -53,6 +54,9 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests((req) -> req
+                        // EndpointRequest handles actuator paths correctly in Spring Boot 3.x
+                        // (MvcRequestMatcher doesn't match actuator endpoints registered outside MVC)
+                        .requestMatchers(EndpointRequest.to(HealthEndpoint.class)).permitAll()
                         .requestMatchers(DEFAULT_WHITE_LIST_URLS).permitAll()
 
                         // V-13: Swagger restricted to ADMIN role — exposes full API map, not for end-users
