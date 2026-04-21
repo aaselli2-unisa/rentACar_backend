@@ -50,47 +50,7 @@ jobs:
           cache: maven
 
       - name: Run security test suite
-        run: |
-          TESTS="AccountLockoutSecurityTest,\
-          AdminControllerSecurityTest,\
-          AuthenticationControllerSecurityTest,\
-          CorsAttackerDomainSecurityTest,\
-          CorsConfigDuplicationSecurityTest,\
-          CorsSecurityTest,\
-          EmployeeControllerSecurityTest,\
-          FileUploadSecurityTest,\
-          GenericExceptionHandlerSecurityTest,\
-          HardcodedCredentialsSecurityTest,\
-          HttpOnlyCookieSecurityTest,\
-          InputValidationSecurityTest,\
-          JwtAuthFilterTest,\
-          JwtClaimsPIISecurityTest,\
-          JwtServiceTest,\
-          JwtTtlSecurityTest,\
-          LogoutSecurityTest,\
-          PasswordComplexitySecurityTest,\
-          PaymentValidationSecurityTest,\
-          RateLimitXForwardedForSecurityTest,\
-          RateLimitingBehaviorTest,\
-          RateLimitingSecurityTest,\
-          RefreshTokenLoggingSecurityTest,\
-          RefreshTokenRevocationSecurityTest,\
-          RentalControllerSecurityTest,\
-          RoleEscalationSecurityTest,\
-          SecurityFilterChainTest,\
-          SwaggerAdminOnlySecurityTest,\
-          SwaggerProdAccessSecurityTest,\
-          UserControllerSecurityTest,\
-          ValidationErrorExposureSecurityTest"
-          TESTS=$(echo "$TESTS" | tr -d ' \n')
-          mvn -B surefire:test \
-            -Dspring.profiles.active=test \
-            -Dtest="$TESTS" \
-          mvn -B surefire:test \
-            -Dspring.profiles.active=test \
-            -Dtest="com.extendrent.security.*" \
-
-            --no-transfer-progress
+        run: mvn -B surefire:test -Dspring.profiles.active=test -Dtest="com.extendrent.security.*" --no-transfer-progress
 
       - name: Upload security test results
         if: always()
@@ -132,7 +92,6 @@ jobs:
         with:
           project: rentACar-backend
           path: .
-
           format: 'ALL'
           args: >-
             --suppression .github/owasp-suppressions.xml
