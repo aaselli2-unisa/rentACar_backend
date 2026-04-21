@@ -1,0 +1,127 @@
+name: Deploy
+
+# Si attiva SOLO dopo che il workflow CI è andato a buon fine su master.
+# Pattern: workflow_run garantisce che compile → test → security → owasp
+# abbiano passato PRIMA di buildare e pushare l'immagine Docker.
+# Con push: [master] diretto i due workflow giravano in parallelo e il deploy
+# poteva partire anche se i test fallivano.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+
+# Permessi minimi di default — ogni job eleva solo ciò che serve.
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. Build & Push immagine Docker su ghcr.io ──────────────────────────────
+  docker-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    # Con workflow_run: procede solo se CI è passato.
+    # Con workflow_dispatch: esecuzione manuale, nessun check sul CI precedente.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write   # push su ghcr.io
+    outputs:
+      image: ${{ steps.image-ref.outputs.image }}
+    steps:
+      - name: Risolvi SHA del commit da deployare
+        id: vars
+        run: |
+          # workflow_run porta il SHA del commit che ha triggerato il CI.
+          # workflow_dispatch usa il SHA corrente del branch.
+          if [ -n "${{ github.event.workflow_run.head_sha }}" ]; then
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.vars.outputs.sha }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (tags + OCI labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=sha-${{ steps.vars.outputs.sha }}
+            type=ref,event=branch
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Set image output
+        id: image-ref
+        run: |
+          echo "image=ghcr.io/${{ github.repository }}:sha-${{ steps.vars.outputs.sha }}" >> "$GITHUB_OUTPUT"
+
+  # ── 2. Trivy – scansione CVE sull'immagine pushata ──────────────────────────
+  # Scansiona l'immagine Docker appena pushata per vulnerabilità nei pacchetti
+  # del sistema operativo e nelle dipendenze Java (CRITICAL + HIGH).
+  # Complementare all'OWASP check del CI: OWASP guarda le dipendenze Maven
+  # dichiarate nel pom, Trivy guarda cosa c'è effettivamente nell'immagine
+  # (incluse le librerie del JRE base e i pacchetti apt).
+  # Blocca il workflow se trova CRITICAL o HIGH.
+  # I risultati appaiono nel tab Security → Code scanning del repo.
+  trivy-scan:
+    name: Trivy Image Scan
+    runs-on: ubuntu-latest
+    needs: docker-push
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write   # necessario per upload SARIF al tab Security
+    steps:
+      - name: Scan image per CVE (CRITICAL + HIGH)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ needs.docker-push.outputs.image }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload SARIF al tab Security di GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Upload risultati come artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-scan-results
+          path: trivy-results.sarif
+          retention-days: 30

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+    <!--
+        Questo file sopprime falsi positivi per l'OWASP Dependency Check.
+
+        Una soppressione è legittima SOLO se:
+          1. Hai analizzato la CVE e verificato che non è sfruttabile nel contesto del progetto.
+          2. Hai documentato la motivazione e la data di revisione.
+
+        Non sopprimere per "togliere il rosso" senza analisi.
+
+        Template:
+        <suppress>
+            <notes>Motivazione – revisione: YYYY-MM-DD</notes>
+            <packageUrl regex="true">^pkg:maven/groupId/artifactId@.*$</packageUrl>
+            <cve>CVE-XXXX-XXXXX</cve>
+        </suppress>
+    -->
+
+    <!--
+        springfox-swagger2 / springfox-boot-starter 3.0.0
+        CVE-2022-34117: path traversal via endpoint /swagger-ui/index.html che
+        permette a un attaccante di leggere file arbitrari del server.
+
+        Perché è un falso positivo in questo progetto:
+        La vulnerabilità è sfruttabile SOLO se il percorso /swagger-ui/** è
+        accessibile senza autenticazione. In questo progetto Swagger è protetto
+        da autenticazione (SecurityConfig patch V13): qualunque accesso a
+        /swagger-ui/** richiede un token JWT valido. Un attaccante non autenticato
+        non può raggiungere l'endpoint vulnerabile.
+
+        Revisione: 2026-04-16
+    -->
+    <suppress>
+        <notes>springfox 3.0.0 CVE-2022-34117: path traversal swagger-ui.
+               Falso positivo: Swagger protetto da autenticazione JWT (SecurityConfig patch V13).
+               Revisione: 2026-04-16</notes>
+        <packageUrl regex="true">^pkg:maven/io\.springfox/.*@3\.0\.0$</packageUrl>
+        <cve>CVE-2022-34117</cve>
+    </suppress>
+
+    <!--
+        springfox-swagger2 / springfox-boot-starter 3.0.0
+        CVE-2023-38286: ReDoS (Regular Expression Denial of Service) nel parser
+        Swagger via input malformato nel campo 'pattern' delle definizioni OpenAPI.
+
+        Perché è un falso positivo in questo progetto:
+        La vulnerabilità richiede che un attaccante possa inviare definizioni
+        OpenAPI malformate al parser. In questo progetto le definizioni OpenAPI
+        sono generate staticamente dal codice sorgente a compile-time (annotazioni
+        @ApiOperation, @Schema, ecc.) — nessun input utente raggiunge mai il parser.
+        Inoltre Swagger è protetto da autenticazione ADMIN (SecurityConfig patch V13),
+        rendendo il vettore di attacco praticamente inaccessibile.
+
+        Revisione: 2026-04-18
+    -->
+    <suppress>
+        <notes>springfox 3.0.0 CVE-2023-38286: ReDoS nel parser Swagger.
+               Falso positivo: definizioni OpenAPI generate a compile-time, non da input utente.
+               Swagger protetto da autenticazione ADMIN (patch V13).
+               Revisione: 2026-04-18</notes>
+        <packageUrl regex="true">^pkg:maven/io\.springfox/.*@3\.0\.0$</packageUrl>
+        <cve>CVE-2023-38286</cve>
+    </suppress>
+
+    <!--
+        cloudinary-http44 1.27.0 — dipendenza transitiva: Apache HttpClient 4.4.x
+        CVE-2020-13956: HttpClient < 4.5.13 gestisce in modo scorretto URI con
+        spazi nel path, permettendo potenzialmente di far risolvere URL diversi
+        da quelli attesi (URL hijacking su proxy intermedi).
+
+        Perché è un falso positivo in questo progetto:
+        cloudinary-http44 usa HttpClient esclusivamente per chiamate outbound
+        verso api.cloudinary.com (URL fisso, hardcoded nella libreria Cloudinary).
+        L'URL non è mai derivato da input utente, quindi il vettore di attacco
+        (attaccante controlla l'URL) non esiste in questo contesto.
+
+        Revisione: 2026-04-16
+    -->
+    <suppress>
+        <notes>cloudinary-http44 1.27.0 — transitivo httpclient 4.4.x CVE-2020-13956:
+               URL parsing. Falso positivo: usato solo per chiamate outbound a
+               api.cloudinary.com (URL fisso, non da input utente).
+               Revisione: 2026-04-16</notes>
+        <packageUrl regex="true">^pkg:maven/com\.cloudinary/cloudinary-http44@.*$</packageUrl>
+        <cve>CVE-2020-13956</cve>
+    </suppress>
+
+</suppressions>
