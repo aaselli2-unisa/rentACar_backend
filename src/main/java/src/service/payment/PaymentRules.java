@@ -13,6 +13,7 @@ import java.util.List;
 
 import static src.core.exception.type.NotFoundExceptionType.PAYMENT_DETAILS_LIST_NOT_FOUND;
 import static src.core.exception.type.PaymentExceptionType.EXPIRY_DATE_HAS_EXPIRED;
+import static src.core.exception.type.PaymentExceptionType.INVALID_CARD_NUMBER;
 
 @RequiredArgsConstructor
 @Service
@@ -31,6 +32,7 @@ public class PaymentRules implements BaseRules {
     public void checkCreditCard(CreditCardInformation creditCardInformation) {
         this.checkCreditCardNumber(creditCardInformation.getCardNumber());
         this.checkOwnerOfCreditCardFullName(creditCardInformation.getCardOwnerName(), creditCardInformation.getCardOwnerSurname());
+        this.checkCreditCardExpirationDate(creditCardInformation.getExpirationDate()); // V-11: wire up expiry check
     }
 
 
@@ -45,14 +47,34 @@ public class PaymentRules implements BaseRules {
     }
 
 
+    // V-10: Luhn algorithm — rejects structurally invalid card numbers
     private void checkCreditCardNumber(String cardNumber) {
+        int sum = 0;
+        boolean alternate = false;
+        for (int i = cardNumber.length() - 1; i >= 0; i--) {
+            int n = cardNumber.charAt(i) - '0';
+            if (alternate) {
+                n *= 2;
+                if (n > 9) n -= 9;
+            }
+            sum += n;
+            alternate = !alternate;
+        }
+        if (sum % 10 != 0) {
+            throw new PaymentException(INVALID_CARD_NUMBER);
+        }
     }
 
     private void checkOwnerOfCreditCardFullName(String name, String surname) {
+        if (name == null || name.isBlank() || surname == null || surname.isBlank()) {
+            throw new PaymentException(INVALID_CARD_NUMBER);
+        }
     }
 
+    // V-11: logic was inverted (threw when card was valid); now throws when expired
+    // Compare by month boundary — expiry day is irrelevant for card validity
     private void checkCreditCardExpirationDate(LocalDate expirationDate) {
-        if (expirationDate.isAfter(LocalDate.now())) {
+        if (expirationDate.isBefore(LocalDate.now().withDayOfMonth(1))) {
             throw new PaymentException(EXPIRY_DATE_HAS_EXPIRED);
         }
     }

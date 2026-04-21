@@ -15,6 +15,7 @@ import src.service.user.model.DefaultUserStatus;
 import src.service.user.model.UserRole;
 import src.service.user.model.UserType;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -56,6 +57,13 @@ public class UserEntity extends BaseEntity implements UserDetails {
     @Enumerated(EnumType.STRING)
     private DefaultUserStatus status;
 
+    // V-14: temporary lockout after repeated failed login attempts
+    @Column(name = "failed_login_attempts", nullable = false, columnDefinition = "int default 0")
+    private int failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
     @ManyToOne
     @JoinColumn(name = "image_id")
     private UserImageEntity userImageEntity;
@@ -80,7 +88,9 @@ public class UserEntity extends BaseEntity implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return status != BLOCKED;
+        if (status == BLOCKED) return false;
+        // V-14: temporary lockout — locked until the cooldown window passes
+        return lockedUntil == null || lockedUntil.isBefore(LocalDateTime.now());
     }
 
     @Override

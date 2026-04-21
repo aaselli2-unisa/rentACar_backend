@@ -31,8 +31,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Every write endpoint must be restricted to the ADMIN role.
  * Every read endpoint must require authentication at minimum.
  *
- * Currently ALL admin endpoints are publicly accessible (permitAll) — each
- * failing test documents a distinct vulnerability.
+ * All endpoints now require ADMIN role (PATCHED S1-1). These tests are
+ * regression guards that turn red if access control is inadvertently relaxed.
  */
 @WebMvcTest(AdminController.class)
 @Import({SecurityConfig.class, AppConfig.class})
@@ -56,21 +56,21 @@ class AdminControllerSecurityTest {
     class UnauthenticatedAccess {
 
         @Test
-        @DisplayName("GET /api/v1/admins must return 401 without a token – FAILS until fixed")
+        @DisplayName("GET /api/v1/admins must return 401 without a token")
         void listAdmins_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/admins"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("GET /api/v1/admins/{id} must return 401 without a token – FAILS until fixed")
+        @DisplayName("GET /api/v1/admins/{id} must return 401 without a token")
         void getAdminById_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/admins/1"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("POST /api/v1/admins must return 401 without a token – FAILS until fixed")
+        @DisplayName("POST /api/v1/admins must return 401 without a token")
         void createAdmin_noAuth_returns401() throws Exception {
             mockMvc.perform(post("/api/v1/admins")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -79,7 +79,7 @@ class AdminControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("PUT /api/v1/admins must return 401 without a token – FAILS until fixed")
+        @DisplayName("PUT /api/v1/admins must return 401 without a token")
         void updateAdmin_noAuth_returns401() throws Exception {
             mockMvc.perform(put("/api/v1/admins")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -88,7 +88,7 @@ class AdminControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/admins must return 401 without a token – FAILS until fixed")
+        @DisplayName("DELETE /api/v1/admins must return 401 without a token")
         void deleteAdmin_noAuth_returns401() throws Exception {
             mockMvc.perform(delete("/api/v1/admins")
                             .param("id", "1")
@@ -97,14 +97,14 @@ class AdminControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/admins/count/{isDeleted} must return 401 without a token – FAILS until fixed")
+        @DisplayName("GET /api/v1/admins/count/{isDeleted} must return 401 without a token")
         void adminCount_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/admins/count/false"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("GET /api/v1/admins (isDeleted filter) must return 401 without a token – FAILS until fixed")
+        @DisplayName("GET /api/v1/admins (isDeleted filter) must return 401 without a token")
         void adminsByDeletedState_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/admins").param("isDeleted", "false"))
                     .andExpect(status().isUnauthorized());
@@ -120,7 +120,7 @@ class AdminControllerSecurityTest {
     class NonAdminRoleAccess {
 
         @Test
-        @DisplayName("POST /api/v1/admins must return 403 for CUSTOMER – FAILS until fixed")
+        @DisplayName("POST /api/v1/admins must return 403 for CUSTOMER")
         @WithMockUser(roles = "CUSTOMER")
         void createAdmin_customerRole_returns403() throws Exception {
             mockMvc.perform(post("/api/v1/admins")
@@ -130,7 +130,7 @@ class AdminControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/admins must return 403 for EMPLOYEE – FAILS until fixed")
+        @DisplayName("DELETE /api/v1/admins must return 403 for EMPLOYEE")
         @WithMockUser(roles = "EMPLOYEE")
         void deleteAdmin_employeeRole_returns403() throws Exception {
             mockMvc.perform(delete("/api/v1/admins")
@@ -140,7 +140,7 @@ class AdminControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("PUT /api/v1/admins must return 403 for CUSTOMER – FAILS until fixed")
+        @DisplayName("PUT /api/v1/admins must return 403 for CUSTOMER")
         @WithMockUser(roles = "CUSTOMER")
         void updateAdmin_customerRole_returns403() throws Exception {
             mockMvc.perform(put("/api/v1/admins")
@@ -186,7 +186,7 @@ class AdminControllerSecurityTest {
     class HardDeleteEndpoint {
 
         @Test
-        @DisplayName("Hard delete without auth must return 401 – FAILS until fixed")
+        @DisplayName("Hard delete without auth must return 401")
         void hardDelete_noAuth_returns401() throws Exception {
             mockMvc.perform(delete("/api/v1/admins")
                             .param("id", "1")
@@ -195,7 +195,7 @@ class AdminControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("Hard delete as CUSTOMER must return 403 – FAILS until fixed")
+        @DisplayName("Hard delete as CUSTOMER must return 403")
         @WithMockUser(roles = "CUSTOMER")
         void hardDelete_customerRole_returns403() throws Exception {
             mockMvc.perform(delete("/api/v1/admins")

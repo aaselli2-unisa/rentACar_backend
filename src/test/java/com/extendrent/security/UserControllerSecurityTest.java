@@ -27,12 +27,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Security tests for {@link UserController}.
  *
- * Documents and enforces:
- * 1. All user-management endpoints MUST require authentication.
- * 2. Listing / reading user data MUST be restricted to ADMIN role.
- * 3. Blocking a user MUST be restricted to ADMIN role.
- * 4. IDOR / password-update vulnerability — any caller can change any user's
- *    password with no identity check and no current-password verification.
+ * Documents and enforces (PATCHED S1-1 / V01):
+ * 1. All user-management endpoints require authentication.
+ * 2. Listing / reading user data is restricted to ADMIN role.
+ * 3. Blocking a user is restricted to ADMIN role.
+ * 4. Password update (PUT /updatePassword) requires ADMIN role;
+ *    unauthenticated callers get 401 and CUSTOMER gets 403.
  */
 @WebMvcTest(UserController.class)
 @Import({SecurityConfig.class, AppConfig.class})
@@ -55,44 +55,45 @@ class UserControllerSecurityTest {
     class UnauthenticatedAccess {
 
         @Test
-        @DisplayName("GET /api/v1/users must return 401 without a token – FAILS until fixed")
+        @DisplayName("GET /api/v1/users must return 401 without a token")
         void listAllUsers_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/users"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("GET /api/v1/users/{id} must return 401 without a token – FAILS until fixed")
+        @DisplayName("GET /api/v1/users/{id} must return 401 without a token")
         void getUserById_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/users/1"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("GET /api/v1/users (isDeleted filter) must return 401 without a token – FAILS until fixed")
+        @DisplayName("GET /api/v1/users (isDeleted filter) must return 401 without a token")
         void getUsersByDeletedState_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/users").param("isDeleted", "false"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("GET /api/v1/users/count/{isDeleted} must return 401 without a token – FAILS until fixed")
+        @DisplayName("GET /api/v1/users/count/{isDeleted} must return 401 without a token")
         void getUserCount_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/users/count/false"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("PUT /api/v1/users/updatePassword must return 401 without a token – FAILS until fixed")
+        @DisplayName("PUT /api/v1/users/updatePassword must return 401 without a token")
         void updatePassword_noAuth_returns401() throws Exception {
+            // Security patch V01: password in body; security check fires before body parsing.
             mockMvc.perform(put("/api/v1/users/updatePassword")
-                            .param("id", "1")
-                            .param("password", "newpassword"))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"id\":1,\"password\":\"newPassword1!\"}"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("PUT /api/v1/users/block/{id} must return 401 without a token – FAILS until fixed")
+        @DisplayName("PUT /api/v1/users/block/{id} must return 401 without a token")
         void blockUser_noAuth_returns401() throws Exception {
             mockMvc.perform(put("/api/v1/users/block/1"))
                     .andExpect(status().isUnauthorized());
@@ -108,7 +109,7 @@ class UserControllerSecurityTest {
     class CustomerRoleAccessControl {
 
         @Test
-        @DisplayName("GET /api/v1/users must return 403 for CUSTOMER role – FAILS until fixed")
+        @DisplayName("GET /api/v1/users must return 403 for CUSTOMER role")
         @WithMockUser(roles = "CUSTOMER")
         void listAllUsers_customerRole_returns403() throws Exception {
             mockMvc.perform(get("/api/v1/users"))
@@ -116,7 +117,7 @@ class UserControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("PUT /api/v1/users/block/{id} must return 403 for CUSTOMER – FAILS until fixed")
+        @DisplayName("PUT /api/v1/users/block/{id} must return 403 for CUSTOMER")
         @WithMockUser(roles = "CUSTOMER")
         void blockUser_customerRole_returns403() throws Exception {
             mockMvc.perform(put("/api/v1/users/block/1"))
@@ -125,52 +126,42 @@ class UserControllerSecurityTest {
     }
 
     // ======================================================================
-    //  IDOR – Password update vulnerability
+    //  Password update – V01 patch + access control (ADMIN-only)
     // ======================================================================
 
     @Nested
-    @DisplayName("VULNERABILITY – IDOR: password update with no ownership or identity check")
-    class PasswordUpdateIdorVulnerability {
+    @DisplayName("V01 patch + RBAC – PUT /api/v1/users/updatePassword")
+    class PasswordUpdateAccessControl {
 
         @Test
-        @DisplayName("PUT /api/v1/users/updatePassword accepts arbitrary user ID without auth – FAILS until fixed")
-        void updatePassword_arbitraryId_noAuth_succeeds() throws Exception {
-            // Any unauthenticated caller can change any user's password by specifying their numeric ID.
-            // The endpoint is publicly accessible AND performs no ownership verification.
-            // Expected CORRECT behaviour: 401 (unauthenticated) → should also verify current password
+        @DisplayName("PUT with old query-param style returns 401 (unauthenticated — security check fires first)")
+        void updatePassword_noAuth_queryParams_returns401() throws Exception {
+            // Security check (401) fires before body parsing, so old-style calls still get 401.
             mockMvc.perform(put("/api/v1/users/updatePassword")
-                            .param("id", "1")       // victim's ID
+                            .param("id", "1")
                             .param("password", "attackerNewPassword"))
-                    .andExpect(status().isUnauthorized()); // currently returns 204 – vulnerability!
+                    .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("Password passed as a query parameter is visible in server logs")
-        void updatePassword_passwordInQueryParam_isLogged() throws Exception {
-            // The password is transmitted as a URL query parameter, which will be recorded in:
-            // - Web-server access logs
-            // - Load-balancer request logs
-            // - Browser history / bookmarks
-            // The endpoint MUST accept the new password in the request body, not in the query string.
-            // This test documents the design flaw — no assertion needed, the test name is the doc.
+        @DisplayName("PUT with JSON body and no auth returns 401 (ADMIN role required)")
+        void updatePassword_jsonBody_noAuth_returns401() throws Exception {
+            // Security patch V01: body is now the accepted format.
+            // Unauthenticated callers get 401 regardless.
             mockMvc.perform(put("/api/v1/users/updatePassword")
-                            .param("id", "99")
-                            .param("password", "SuperSecret!"))
-                    // Currently the request is accepted (200/204) — not rejected for bad design.
-                    .andExpect(status().is(not(405))); // method still supported (not removed)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"id\":1,\"password\":\"newSecure!99\"}"))
+                    .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("CUSTOMER authenticated user can update ANY other user's password – FAILS until fixed")
+        @DisplayName("CUSTOMER role is forbidden (endpoint requires ADMIN)")
         @WithMockUser(username = "customer@example.com", roles = "CUSTOMER")
-        void updatePassword_customerCanUpdateAnyUser() throws Exception {
-            // Even after authentication is enforced, the lack of ownership check means
-            // one customer can overwrite another customer's (or an admin's) password.
-            // Required fix: @PreAuthorize("#id == principal.id")
+        void updatePassword_customerRole_returns403() throws Exception {
             mockMvc.perform(put("/api/v1/users/updatePassword")
-                            .param("id", "999")  // different user's ID
-                            .param("password", "hackedPassword"))
-                    .andExpect(status().isForbidden()); // must be 403 — currently 204
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"id\":1,\"password\":\"newSecure!99\"}"))
+                    .andExpect(status().isForbidden());
         }
     }
 

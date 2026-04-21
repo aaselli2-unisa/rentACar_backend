@@ -13,6 +13,12 @@ target/
 .springBeans
 .sts4-cache
 src/main/resources/application.properties
+.env
+.env.*
+!.env.example
+secrets/*
+!secrets/*.example
+!secrets/README.md
 tobeto_rentAcar_crew_project/.idea/misc.xml
 src/main/resources/assets/
 ### IntelliJ IDEA ###
@@ -35,3 +41,15 @@ misc.xml
 compiler.xml
 ### VS Code ###
 .vscode/
+.ai
+.claude
+.idea
+.junie
+
+### Security audit docs (local only) ###
+CHANGELOG.md
+SECURITY*.md
+Security_Test_Report.md
+security_*.md
+postman/
+app.log

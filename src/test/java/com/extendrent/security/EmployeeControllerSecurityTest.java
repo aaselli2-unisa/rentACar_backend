@@ -25,11 +25,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Security tests for {@link EmployeeController}.
+ * Security tests for {@link EmployeeController} (PATCHED S1-1).
  *
  * Employee data (salary, phone, personal info) is sensitive PII.
- * The salary-range filter in particular enables harvesting compensation data
- * without any authentication — a significant privacy and business-intelligence risk.
+ * All endpoints require authentication; salary and PII-exposing filters
+ * are additionally protected. These tests are regression guards.
  */
 @WebMvcTest(EmployeeController.class)
 @Import({SecurityConfig.class, AppConfig.class})
@@ -53,21 +53,21 @@ class EmployeeControllerSecurityTest {
     class UnauthenticatedAccess {
 
         @Test
-        @DisplayName("GET /api/v1/employees must return 401 without token – FAILS until fixed")
+        @DisplayName("GET /api/v1/employees must return 401 without token")
         void listEmployees_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/employees"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("GET /api/v1/employees/{id} must return 401 without token – FAILS until fixed")
+        @DisplayName("GET /api/v1/employees/{id} must return 401 without token")
         void getEmployeeById_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/employees/1"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("POST /api/v1/employees must return 401 without token – FAILS until fixed")
+        @DisplayName("POST /api/v1/employees must return 401 without token")
         void createEmployee_noAuth_returns401() throws Exception {
             mockMvc.perform(post("/api/v1/employees")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -76,7 +76,7 @@ class EmployeeControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("PUT /api/v1/employees must return 401 without token – FAILS until fixed")
+        @DisplayName("PUT /api/v1/employees must return 401 without token")
         void updateEmployee_noAuth_returns401() throws Exception {
             mockMvc.perform(put("/api/v1/employees")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -85,7 +85,7 @@ class EmployeeControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/employees must return 401 without token – FAILS until fixed")
+        @DisplayName("DELETE /api/v1/employees must return 401 without token")
         void deleteEmployee_noAuth_returns401() throws Exception {
             mockMvc.perform(delete("/api/v1/employees")
                             .param("id", "1")
@@ -94,10 +94,10 @@ class EmployeeControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("VULNERABILITY: Salary range filter exposes salary PII without auth – FAILS until fixed")
-        void salaryRange_noAuth_exposesSensitivePii() throws Exception {
-            // An unauthenticated attacker can enumerate all employees and their salary ranges.
-            // This is a severe PII and business-intelligence leak.
+        @DisplayName("Salary range filter requires authentication – unauthenticated PII access blocked (PATCHED S1-1)")
+        void salaryRange_noAuth_returns401() throws Exception {
+            // PATCHED S1-1: salary range filter previously exposed all employee salaries to
+            // unauthenticated callers. Now requires authentication.
             mockMvc.perform(get("/api/v1/employees")
                             .param("startSalary", "0")
                             .param("endSalary", "1000000"))
@@ -105,8 +105,8 @@ class EmployeeControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("VULNERABILITY: Phone number lookup by phone exposes PII without auth – FAILS until fixed")
-        void phoneNumberLookup_noAuth_exposesPii() throws Exception {
+        @DisplayName("Phone number lookup requires authentication – unauthenticated PII access blocked (PATCHED S1-1)")
+        void phoneNumberLookup_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/employees/phone/5551234567"))
                     .andExpect(status().isUnauthorized());
         }
@@ -121,7 +121,7 @@ class EmployeeControllerSecurityTest {
     class CustomerRoleAccess {
 
         @Test
-        @DisplayName("GET /api/v1/employees must return 403 for CUSTOMER – FAILS until fixed")
+        @DisplayName("GET /api/v1/employees must return 403 for CUSTOMER")
         @WithMockUser(roles = "CUSTOMER")
         void listEmployees_customerRole_returns403() throws Exception {
             mockMvc.perform(get("/api/v1/employees"))
@@ -129,7 +129,7 @@ class EmployeeControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/employees (salary filter) must return 403 for CUSTOMER – FAILS until fixed")
+        @DisplayName("GET /api/v1/employees (salary filter) must return 403 for CUSTOMER")
         @WithMockUser(roles = "CUSTOMER")
         void salaryFilter_customerRole_returns403() throws Exception {
             mockMvc.perform(get("/api/v1/employees")
@@ -139,7 +139,7 @@ class EmployeeControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/employees must return 403 for CUSTOMER – FAILS until fixed")
+        @DisplayName("POST /api/v1/employees must return 403 for CUSTOMER")
         @WithMockUser(roles = "CUSTOMER")
         void createEmployee_customerRole_returns403() throws Exception {
             mockMvc.perform(post("/api/v1/employees")

@@ -1,5 +1,6 @@
 package src.controller.user;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -10,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import src.controller.TResponse;
+import src.controller.user.request.UpdatePasswordRequest;
 import src.controller.user.response.UserResponse;
 import src.service.user.UserService;
 
@@ -69,12 +71,14 @@ public class UserController {
         );
     }
 
+    // Security patch V01: password moved from query parameter to request body so it
+    // is never written to server access logs, browser history, or Referer headers.
     @PutMapping("/updatePassword")
     public ResponseEntity<TResponse<Void>> updatePassword(
-            @RequestParam int id, @RequestParam String password) {
-        log.info(UPDATING_USER_PASSWORD, id);
-        userService.updatePassword(id, password);
-        log.info(USER_PASSWORD_UPDATED, id);
+            @Valid @RequestBody UpdatePasswordRequest request) {
+        log.info(UPDATING_USER_PASSWORD, request.getId());
+        userService.updatePassword(request.getId(), request.getPassword());
+        log.info(USER_PASSWORD_UPDATED, request.getId());
         return new ResponseEntity<>(TResponse.<Void>tResponseBuilder()
                 .build(), HttpStatus.NO_CONTENT
         );

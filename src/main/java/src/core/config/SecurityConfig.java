@@ -1,6 +1,8 @@
 package src.core.config;
 
 import lombok.AllArgsConstructor;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
+import org.springframework.boot.actuate.health.HealthEndpoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -17,6 +19,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import src.core.security.JwtAuthFilter;
+import src.core.security.RateLimitFilter;
 
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
@@ -26,18 +29,19 @@ import static org.springframework.security.config.Customizer.withDefaults;
 @AllArgsConstructor
 public class SecurityConfig {
 
+    // Security patch V13: Swagger and API-docs paths removed from the public whitelist.
+    // They are placed under authenticated() below so any logged-in user can use them.
+    // In production, consider restricting further to hasRole("ADMIN") or disabling entirely
+    // via @Profile("!prod") on OpenApiConfig/SwaggerConfig.
+    // The Azure URL entry (/extendrent.azurewebsites.net/...) has also been removed — its
+    // purpose was undocumented and it created an unusual literal path match.
     private static final String[] DEFAULT_WHITE_LIST_URLS = {
-            "/swagger-ui/**",
-            "/v2/api-docs",
-            "/v3/api-docs",
-            "/v3/api-docs/**",
-            "/api/auth/**",
-            "/swagger-ui.html",
-            "/extendrent.azurewebsites.net/api/v1/**"
+            "/api/auth/**"
     };
 
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final RateLimitFilter rateLimitFilter;
     private final PasswordEncoder passwordEncoder;
     private final UserDetailsService userService;
 
@@ -50,13 +54,22 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests((req) -> req
+                        // EndpointRequest handles actuator paths correctly in Spring Boot 3.x
+                        // (MvcRequestMatcher doesn't match actuator endpoints registered outside MVC)
+                        .requestMatchers(EndpointRequest.to(HealthEndpoint.class)).permitAll()
                         .requestMatchers(DEFAULT_WHITE_LIST_URLS).permitAll()
 
+                        // V-13: Swagger restricted to ADMIN role — exposes full API map, not for end-users
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html",
+                                "/v2/api-docs", "/v3/api-docs", "/v3/api-docs/**").hasRole("ADMIN")
+
                         // Public authentication/verification endpoints
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/signup", "/api/v1/auth/signin").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/isUserTrue").permitAll()
+                        // Security patch V01: isUserTrue converted to POST (password moved to body)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/signup", "/api/v1/auth/signin", "/api/v1/auth/isUserTrue").permitAll()
                         .requestMatchers("/api/v1/verify/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/refresh-token/**").permitAll()
+                        // V-04: logout needs to be authenticated (revokes tokens for the calling user)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").authenticated()
 
                         // Security-sensitive areas protected by role
                         .requestMatchers("/api/v1/admins/**").hasRole("ADMIN")
@@ -78,6 +91,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/fuels/**").authenticated()
                         .requestMatchers("/api/v1/gearshifts/**").authenticated()
                         .requestMatchers("/api/v1/vehicle-statuses/**").authenticated()
+                        // GET drivingLicenseType is needed by the public signup form (dropdown)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/drivingLicenseType/**").permitAll()
                         .requestMatchers("/api/v1/drivingLicenseType/**").authenticated()
                         .requestMatchers("/api/v1/rentalStatuses/**").authenticated()
                         .requestMatchers("/api/v1/car-segments/**").authenticated()
@@ -90,8 +105,16 @@ public class SecurityConfig {
                                 response.sendError(FORBIDDEN.value(), FORBIDDEN.getReasonPhrase()))
                 )
                 .authenticationProvider(authenticationProvider())
+                // Security patch V06: rate limiting runs before JWT auth on all auth endpoints
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Security patch V14: add Content-Security-Policy header (OWASP A05 / CWE-693).
+                // Restricts resource loading to same origin; frame-ancestors 'none' prevents clickjacking.
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'self'; frame-ancestors 'none'"))
+                );
         return http.build();
     }
 

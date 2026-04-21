@@ -1,0 +1,28 @@
+target/
+.git/
+.idea/
+.vscode/
+*.iml
+*.log
+
+# Credenziali e segreti
+.env
+.env.example
+src/main/resources/application.properties
+secrets/
+
+# File Docker e CI non necessari nell'immagine
+docker-compose.yml
+.gitignore
+.github/
+
+# Documentazione
+*.md
+!src/**/*.md
+
+# Maven wrapper (non usato nel Dockerfile)
+mvnw
+mvnw.cmd
+.mvn/
+
+

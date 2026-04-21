@@ -8,22 +8,11 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    private static final String[] ALLOWED_ORIGINS = {
-            "http://localhost:3000",
-            "http://localhost:5173",
-            "https://legit-frontend.example.com",
-            "https://attacker.example.com",
-            "https://evil-attacker.com"
-    };
-
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**")
-                .allowedOrigins(ALLOWED_ORIGINS)
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("Content-Type", "Authorization")
-                .maxAge(3600);
-    }
+    // Security patch V12: removed duplicate addCorsMappings override.
+    // CORS is configured exclusively in CorsConfig and wired through
+    // Spring Security via .cors(withDefaults()). Having two WebMvcConfigurer
+    // beans registering "/**" creates undefined merge behaviour and risks
+    // re-introducing attacker domains on future edits.
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {

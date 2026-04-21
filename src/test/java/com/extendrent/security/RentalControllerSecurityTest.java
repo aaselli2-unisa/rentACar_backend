@@ -59,21 +59,21 @@ class RentalControllerSecurityTest {
     class UnauthenticatedAccess {
 
         @Test
-        @DisplayName("GET /api/v1/rentals must return 401 without a token – FAILS until fixed")
+        @DisplayName("GET /api/v1/rentals must return 401 without a token")
         void listAllRentals_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/rentals"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("GET /api/v1/rentals/{id} must return 401 without a token – FAILS until fixed")
+        @DisplayName("GET /api/v1/rentals/{id} must return 401 without a token")
         void getRentalById_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/rentals/1"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("POST /api/v1/rentals must return 401 without a token – FAILS until fixed")
+        @DisplayName("POST /api/v1/rentals must return 401 without a token")
         void createRental_noAuth_returns401() throws Exception {
             mockMvc.perform(post("/api/v1/rentals")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -82,7 +82,7 @@ class RentalControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("PUT /api/v1/rentals must return 401 without a token – FAILS until fixed")
+        @DisplayName("PUT /api/v1/rentals must return 401 without a token")
         void updateRental_noAuth_returns401() throws Exception {
             mockMvc.perform(put("/api/v1/rentals")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -91,7 +91,7 @@ class RentalControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/rentals must return 401 without a token – FAILS until fixed")
+        @DisplayName("DELETE /api/v1/rentals must return 401 without a token")
         void deleteRental_noAuth_returns401() throws Exception {
             mockMvc.perform(delete("/api/v1/rentals")
                             .param("id", "1")
@@ -100,14 +100,14 @@ class RentalControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("PUT /api/v1/rentals/startRental/{id} must return 401 – FAILS until fixed")
+        @DisplayName("PUT /api/v1/rentals/startRental/{id} must return 401")
         void startRental_noAuth_returns401() throws Exception {
             mockMvc.perform(put("/api/v1/rentals/startRental/1"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("PUT /api/v1/rentals/returnRental must return 401 – FAILS until fixed")
+        @DisplayName("PUT /api/v1/rentals/returnRental must return 401")
         void returnRental_noAuth_returns401() throws Exception {
             mockMvc.perform(put("/api/v1/rentals/returnRental")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -116,14 +116,14 @@ class RentalControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("PUT /api/v1/rentals/cancelRental/{id} must return 401 – FAILS until fixed")
+        @DisplayName("PUT /api/v1/rentals/cancelRental/{id} must return 401")
         void cancelRental_noAuth_returns401() throws Exception {
             mockMvc.perform(put("/api/v1/rentals/cancelRental/1"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("POST /api/v1/rentals/showRental must return 401 – FAILS until fixed")
+        @DisplayName("POST /api/v1/rentals/showRental must return 401")
         void showRental_noAuth_returns401() throws Exception {
             mockMvc.perform(post("/api/v1/rentals/showRental")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -132,28 +132,28 @@ class RentalControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/rentals (isDeleted filter) must return 401 – FAILS until fixed")
+        @DisplayName("GET /api/v1/rentals (isDeleted filter) must return 401")
         void rentalsByDeletedState_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/rentals").param("isDeleted", "false"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("GET /api/v1/rentals (statusId filter) must return 401 – FAILS until fixed")
+        @DisplayName("GET /api/v1/rentals (statusId filter) must return 401")
         void rentalsByStatus_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/rentals").param("statusId", "1"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("GET /api/v1/rentals/count/{isDeleted} must return 401 – FAILS until fixed")
+        @DisplayName("GET /api/v1/rentals/count/{isDeleted} must return 401")
         void rentalCount_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/rentals/count/false"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("GET /api/v1/rentals/countByStatus/{status} must return 401 – FAILS until fixed")
+        @DisplayName("GET /api/v1/rentals/countByStatus/{status} must return 401")
         void rentalCountByStatus_noAuth_returns401() throws Exception {
             mockMvc.perform(get("/api/v1/rentals/countByStatus/1"))
                     .andExpect(status().isUnauthorized());
@@ -169,7 +169,7 @@ class RentalControllerSecurityTest {
     class CustomerRoleRestrictions {
 
         @Test
-        @DisplayName("DELETE /api/v1/rentals must return 403 for CUSTOMER – FAILS until fixed")
+        @DisplayName("DELETE /api/v1/rentals must return 403 for CUSTOMER")
         @WithMockUser(roles = "CUSTOMER")
         void deleteRental_customerRole_returns403() throws Exception {
             mockMvc.perform(delete("/api/v1/rentals")
@@ -179,7 +179,7 @@ class RentalControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("PUT /api/v1/rentals/startRental must return 403 for CUSTOMER – FAILS until fixed")
+        @DisplayName("PUT /api/v1/rentals/startRental must return 403 for CUSTOMER")
         @WithMockUser(roles = "CUSTOMER")
         void startRental_customerRole_returns403() throws Exception {
             // Starting a rental is an EMPLOYEE/ADMIN operation, not a customer action
@@ -197,9 +197,9 @@ class RentalControllerSecurityTest {
     class RentalOwnershipCheck {
 
         @Test
-        @DisplayName("CUSTOMER cannot read all rentals (ADMIN-only endpoint)")
+        @DisplayName("CUSTOMER cannot list all rentals (ADMIN-only endpoint)")
         @WithMockUser(username = "customer1@example.com", roles = "CUSTOMER")
-        void getRentalById_canAccessOtherCustomerRental() throws Exception {
+        void listAllRentals_customerRole_returns403() throws Exception {
             // Current hardening uses role-based restriction: rentals listing is ADMIN-only.
             when(rentalService.getAll()).thenReturn(List.of());
             mockMvc.perform(get("/api/v1/rentals"))

@@ -1,6 +1,7 @@
 package src.controller.auth.authentication.request;
 
 import jakarta.validation.constraints.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -28,13 +29,17 @@ public class SignUpReqeust {
     @NotBlank(message = "Email address cannot be blank")
     String emailAddress;
 
-    @Size(min = 8, max = 30)
+    // V-08: enforce complexity — uppercase, lowercase, digit, special char required
     @NotBlank(message = "Password cannot be blank")
+    @Pattern(
+            regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,30}$",
+            message = "Password must be 8-30 characters and contain at least one uppercase letter, one lowercase letter, one digit, and one special character (@$!%*?&)"
+    )
     String password;
 
+    // V-12: disallow all-zeros and other trivially invalid numbers
     @NotBlank(message = "Phone number cannot be blank")
-    @Size(min = 10, max = 10, message = "Phone number must be 10 digits.")
-    @Pattern(regexp = "^[0-9]+$", message = "Phone number must consist of digits only.")
+    @Pattern(regexp = "^[1-9][0-9]{9}$", message = "Phone number must be 10 digits and must not start with 0.")
     String phoneNumber;
 
     Double salary;
@@ -45,6 +50,16 @@ public class SignUpReqeust {
 
     @NotNull
     UserRole authority;
+
+    /**
+     * Security patch V02 — only CUSTOMER role is allowed through the public signup endpoint.
+     * ADMIN and EMPLOYEE accounts must be created via the protected admin-only endpoints.
+     */
+    @AssertTrue(message = "Only CUSTOMER role is allowed for public signup")
+    @JsonIgnore
+    public boolean isAuthorityCustomer() {
+        return authority == UserRole.CUSTOMER;
+    }
 
     @NotNull
     int userImageEntityId;

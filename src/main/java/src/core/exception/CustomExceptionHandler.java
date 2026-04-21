@@ -2,6 +2,7 @@ package src.core.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
@@ -28,12 +29,19 @@ public class CustomExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(CustomExceptionHandler.class);
 
+    // V-06: expose field-level validation details only in non-production environments
+    @Value("${app.expose-validation-details:false}")
+    private boolean exposeValidationDetails;
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public TResponse<?> handleException(Exception e) {
+        // Security patch V08: raw e.getMessage() replaced with a generic string.
+        // The full exception (with stack trace and DB details) is kept in the server log only.
         log(ERROR_GENERIC_EXCEPTION, e);
         return TResponse.tResponseBuilder()
-                .response(new ErrorResponse(NotFoundExceptionType.GENERIC_EXCEPTION, Collections.singletonList(e.getMessage())))
+                .response(new ErrorResponse(NotFoundExceptionType.GENERIC_EXCEPTION,
+                        Collections.singletonList("An internal error occurred. Please contact support.")))
                 .build();
     }
 
@@ -148,7 +156,12 @@ public class CustomExceptionHandler {
 
         log(ERROR_VALIDATION, validationException);
         ErrorResponse errorResponse = new ErrorResponse(validationExceptionType, Collections.singletonList("Validation error"));
-        errorResponse.setDetails(validationErrors);
+
+        // V-06: field names leaked to clients allow enumeration of DTO structure;
+        // expose details only in dev (app.expose-validation-details=true)
+        errorResponse.setDetails(exposeValidationDetails
+                ? validationErrors
+                : Collections.singletonList("Validation error"));
 
         return TResponse.tResponseBuilder()
                 .response(errorResponse)

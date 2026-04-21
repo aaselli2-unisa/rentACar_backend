@@ -14,7 +14,9 @@ import src.service.image.ImageRules;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
+import static src.core.exception.type.FileExceptionType.INVALID_FILE_TYPE;
 import static src.core.exception.type.FileExceptionType.PHOTO_DELETE_FAILED;
 import static src.core.exception.type.FileExceptionType.PHOTO_UPLOAD_FAILED;
 import static src.core.exception.type.NotFoundExceptionType.IMAGE_NOT_FOUND;
@@ -22,6 +24,12 @@ import static src.core.exception.type.NotFoundExceptionType.IMAGE_NOT_FOUND;
 @Service
 @RequiredArgsConstructor
 public class UserImageServiceImpl implements UserImageService {
+
+    // Security patch V07: same content-type whitelist as CarImageServiceImpl.
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "image/jpeg", "image/jpg", "image/png", "image/webp"
+    );
+
     private final UserImageRepository repository;
     private final CloudinaryServiceImpl cloudinaryServiceImpl;
     private final ImageRules rules;
@@ -30,6 +38,10 @@ public class UserImageServiceImpl implements UserImageService {
     public int create(MultipartFile file, String emailAddress) throws IOException {
         if (file == null) {
             return getIdByName("default_user_image");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
+            throw new FileException(INVALID_FILE_TYPE);
         }
         try {
             byte[] newByte = ImageUtils.resizeImage(file.getBytes(), 400, 400);

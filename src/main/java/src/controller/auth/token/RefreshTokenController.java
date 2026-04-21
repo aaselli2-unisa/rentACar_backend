@@ -26,7 +26,8 @@ public class RefreshTokenController {
 
     @PostMapping
     public ResponseEntity<TResponse<JwtToken>> refreshToken(@RequestBody RefreshTokenRequest refreshTokenRequest) {
-        log.info(REFRESH_TOKEN_REQUEST_RECEIVED, refreshTokenRequest.getToken());
+        // Security patch V05: token value removed from log to prevent credential leakage.
+        log.info(REFRESH_TOKEN_REQUEST_RECEIVED);
         JwtToken refreshedToken = accessTokenService.refreshToken(refreshTokenRequest);
         log.info(REFRESH_TOKEN_SUCCESSFUL);
         return new ResponseEntity<>(TResponse.<JwtToken>tResponseBuilder()

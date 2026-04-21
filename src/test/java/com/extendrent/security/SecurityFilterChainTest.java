@@ -35,16 +35,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Security filter-chain integration tests.
+ * Security filter-chain integration tests (PATCHED S1-1).
  *
- * Each test asserts the REQUIRED security posture (what the application SHOULD
- * enforce). Tests that currently FAIL expose known vulnerabilities — they become
- * green once the SecurityConfig is corrected.
- *
- * ⚠ CRITICAL FINDINGS documented here:
- *   - All sensitive endpoints are exposed to unauthenticated callers (permitAll())
- *   - No role-based access control on write / delete operations
- *   - Credentials passed as query parameters on /auth/isUserTrue
+ * Each test verifies the required access-control posture. All sensitive endpoints
+ * now require authentication or the appropriate role. These tests are regression
+ * guards — they turn red if SecurityConfig is inadvertently relaxed.
  */
 @WebMvcTest({
         UserController.class,
@@ -106,43 +101,45 @@ class SecurityFilterChainTest {
         }
 
         @Test
-        @DisplayName("VULNERABILITY: GET /api/v1/auth/isUserTrue exposes credentials as query params")
-        void isUserTrue_exposesCredentialsInUrl() throws Exception {
-            // The endpoint accepts plaintext credentials in the query string.
-            // It should be removed or replaced with a POST that uses a request body.
-            // This test documents the CURRENT (bad) behaviour — it should still reach the
-            // controller layer (no 401) since it is in the whitelist.
-            mockMvc.perform(get("/api/v1/auth/isUserTrue")
+        @DisplayName("PATCHED V01: GET /api/v1/auth/isUserTrue no longer accepts query-param credentials")
+        void isUserTrue_getWithQueryParams_isBlocked() throws Exception {
+            // V01 fix: endpoint changed to POST with JSON body.
+            // GET is no longer a valid method — Spring Security returns 401 before dispatch,
+            // or the dispatcher returns 405. Both confirm credentials cannot be passed via URL.
+            int status = mockMvc.perform(get("/api/v1/auth/isUserTrue")
                             .param("email", "admin@example.com")
                             .param("password", "secret"))
-                    .andExpect(status().is(not(401)));
+                    .andReturn().getResponse().getStatus();
+            org.assertj.core.api.Assertions.assertThat(status)
+                    .as("GET /api/v1/auth/isUserTrue must return 401 or 405, not 200 or 500. Got: %d", status)
+                    .isIn(401, 405);
         }
     }
 
     // ======================================================================
-    //  /api/v1/users — should require authentication (currently does NOT)
+    //  /api/v1/users — requires authentication (PATCHED S1-1)
     // ======================================================================
 
     @Nested
-    @DisplayName("VULNERABILITY – /api/v1/users endpoints allow unauthenticated access")
-    class UserEndpointVulnerabilities {
+    @DisplayName("/api/v1/users – all endpoints require authentication (PATCHED S1-1)")
+    class UserEndpointProtection {
 
         @Test
-        @DisplayName("GET /api/v1/users must require authentication – FAILS until fixed")
+        @DisplayName("GET /api/v1/users must require authentication")
         void listAllUsers_mustRequireAuth() throws Exception {
             mockMvc.perform(get("/api/v1/users"))
-                    .andExpect(status().isUnauthorized()); // 401 — currently returns 200
+                    .andExpect(status().isUnauthorized()); // 401 — PATCHED S1-1 (was 200 before fix)
         }
 
         @Test
-        @DisplayName("GET /api/v1/users/{id} must require authentication – FAILS until fixed")
+        @DisplayName("GET /api/v1/users/{id} must require authentication")
         void getUserById_mustRequireAuth() throws Exception {
             mockMvc.perform(get("/api/v1/users/1"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("PUT /api/v1/users/updatePassword must require authentication – FAILS until fixed")
+        @DisplayName("PUT /api/v1/users/updatePassword must require authentication")
         void updatePassword_mustRequireAuth() throws Exception {
             mockMvc.perform(put("/api/v1/users/updatePassword")
                             .param("id", "1")
@@ -151,14 +148,14 @@ class SecurityFilterChainTest {
         }
 
         @Test
-        @DisplayName("PUT /api/v1/users/block/{id} must require ADMIN role – FAILS until fixed")
+        @DisplayName("PUT /api/v1/users/block/{id} must require ADMIN role")
         void blockUser_mustRequireAdminRole() throws Exception {
             mockMvc.perform(put("/api/v1/users/block/1"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("GET /api/v1/users (deleted filter) must require authentication – FAILS until fixed")
+        @DisplayName("GET /api/v1/users (deleted filter) must require authentication")
         void listUsersByDeletedState_mustRequireAuth() throws Exception {
             mockMvc.perform(get("/api/v1/users").param("isDeleted", "false"))
                     .andExpect(status().isUnauthorized());
@@ -166,15 +163,15 @@ class SecurityFilterChainTest {
     }
 
     // ======================================================================
-    //  /api/v1/admins — should require ADMIN role (currently does NOT)
+    //  /api/v1/admins — requires ADMIN role (PATCHED S1-1)
     // ======================================================================
 
     @Nested
-    @DisplayName("VULNERABILITY – /api/v1/admins endpoints allow unauthenticated access")
-    class AdminEndpointVulnerabilities {
+    @DisplayName("/api/v1/admins – all endpoints require authentication (PATCHED S1-1)")
+    class AdminEndpointProtection {
 
         @Test
-        @DisplayName("POST /api/v1/admins must require ADMIN role – FAILS until fixed")
+        @DisplayName("POST /api/v1/admins must require ADMIN role")
         void createAdmin_mustRequireAdminRole() throws Exception {
             mockMvc.perform(post("/api/v1/admins")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -183,14 +180,14 @@ class SecurityFilterChainTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/admins must require authentication – FAILS until fixed")
+        @DisplayName("GET /api/v1/admins must require authentication")
         void listAdmins_mustRequireAuth() throws Exception {
             mockMvc.perform(get("/api/v1/admins"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/admins must require ADMIN role – FAILS until fixed")
+        @DisplayName("DELETE /api/v1/admins must require ADMIN role")
         void deleteAdmin_mustRequireAdminRole() throws Exception {
             mockMvc.perform(delete("/api/v1/admins")
                             .param("id", "1")
@@ -200,15 +197,15 @@ class SecurityFilterChainTest {
     }
 
     // ======================================================================
-    //  /api/v1/employees — should require admin/employee role (currently does NOT)
+    //  /api/v1/employees — requires admin/employee role (PATCHED S1-1)
     // ======================================================================
 
     @Nested
-    @DisplayName("VULNERABILITY – /api/v1/employees endpoints allow unauthenticated access")
-    class EmployeeEndpointVulnerabilities {
+    @DisplayName("/api/v1/employees – all endpoints require authentication (PATCHED S1-1)")
+    class EmployeeEndpointProtection {
 
         @Test
-        @DisplayName("POST /api/v1/employees must require ADMIN role – FAILS until fixed")
+        @DisplayName("POST /api/v1/employees must require ADMIN role")
         void createEmployee_mustRequireAdminRole() throws Exception {
             mockMvc.perform(post("/api/v1/employees")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -217,14 +214,14 @@ class SecurityFilterChainTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/employees must require authentication – FAILS until fixed")
+        @DisplayName("GET /api/v1/employees must require authentication")
         void listEmployees_mustRequireAuth() throws Exception {
             mockMvc.perform(get("/api/v1/employees"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/employees must require ADMIN role – FAILS until fixed")
+        @DisplayName("DELETE /api/v1/employees must require ADMIN role")
         void deleteEmployee_mustRequireAdminRole() throws Exception {
             mockMvc.perform(delete("/api/v1/employees")
                             .param("id", "1")
@@ -233,7 +230,7 @@ class SecurityFilterChainTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/employees (salary range) exposes salary data without auth – FAILS until fixed")
+        @DisplayName("GET /api/v1/employees (salary range) requires authentication – salary PII protected (PATCHED S1-1)")
         void salaryFilter_mustRequireAuth() throws Exception {
             // Salary data is sensitive PII and must not be accessible without authentication
             mockMvc.perform(get("/api/v1/employees")
@@ -244,22 +241,22 @@ class SecurityFilterChainTest {
     }
 
     // ======================================================================
-    //  /api/v1/rentals — should require authentication (currently does NOT)
+    //  /api/v1/rentals — requires authentication (PATCHED S1-1)
     // ======================================================================
 
     @Nested
-    @DisplayName("VULNERABILITY – /api/v1/rentals endpoints allow unauthenticated access")
-    class RentalEndpointVulnerabilities {
+    @DisplayName("/api/v1/rentals – all endpoints require authentication (PATCHED S1-1)")
+    class RentalEndpointProtection {
 
         @Test
-        @DisplayName("GET /api/v1/rentals must require authentication – FAILS until fixed")
+        @DisplayName("GET /api/v1/rentals must require authentication")
         void listAllRentals_mustRequireAuth() throws Exception {
             mockMvc.perform(get("/api/v1/rentals"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("POST /api/v1/rentals must require authentication – FAILS until fixed")
+        @DisplayName("POST /api/v1/rentals must require authentication")
         void createRental_mustRequireAuth() throws Exception {
             mockMvc.perform(post("/api/v1/rentals")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -268,7 +265,7 @@ class SecurityFilterChainTest {
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/rentals must require ADMIN role – FAILS until fixed")
+        @DisplayName("DELETE /api/v1/rentals must require ADMIN role")
         void deleteRental_mustRequireAdminRole() throws Exception {
             mockMvc.perform(delete("/api/v1/rentals")
                             .param("id", "1")
@@ -277,14 +274,14 @@ class SecurityFilterChainTest {
         }
 
         @Test
-        @DisplayName("PUT /api/v1/rentals/startRental/{id} must require authentication – FAILS until fixed")
+        @DisplayName("PUT /api/v1/rentals/startRental/{id} must require authentication")
         void startRental_mustRequireAuth() throws Exception {
             mockMvc.perform(put("/api/v1/rentals/startRental/1"))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("PUT /api/v1/rentals/cancelRental/{id} must require authentication – FAILS until fixed")
+        @DisplayName("PUT /api/v1/rentals/cancelRental/{id} must require authentication")
         void cancelRental_mustRequireAuth() throws Exception {
             mockMvc.perform(put("/api/v1/rentals/cancelRental/1"))
                     .andExpect(status().isUnauthorized());
@@ -296,11 +293,11 @@ class SecurityFilterChainTest {
     // ======================================================================
 
     @Nested
-    @DisplayName("VULNERABILITY – /api/v1/discounts write operations allow unauthenticated access")
-    class DiscountEndpointVulnerabilities {
+    @DisplayName("/api/v1/discounts – write operations require authentication (PATCHED S1-1)")
+    class DiscountEndpointProtection {
 
         @Test
-        @DisplayName("POST /api/v1/discounts must require ADMIN role – FAILS until fixed")
+        @DisplayName("POST /api/v1/discounts must require ADMIN role")
         void createDiscount_mustRequireAdminRole() throws Exception {
             mockMvc.perform(post("/api/v1/discounts")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -309,7 +306,7 @@ class SecurityFilterChainTest {
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/discounts must require ADMIN role – FAILS until fixed")
+        @DisplayName("DELETE /api/v1/discounts must require ADMIN role")
         void deleteDiscount_mustRequireAdminRole() throws Exception {
             mockMvc.perform(delete("/api/v1/discounts")
                             .param("id", "1")
