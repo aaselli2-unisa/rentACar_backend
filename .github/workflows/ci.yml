@@ -32,8 +32,8 @@ jobs:
 
   # ── 2. Security Tests (OWASP patches) ───────────────────────────────
   # Job dedicato ai test di sicurezza: fallisce la pipeline se uno fallisce.
-  # Lista aggiornata al 2026-04-18: 31 classi (21 originali + EmployeeControllerSecurityTest
-  # + 9 nuove classi aggiunte con i fix).
+  # 31 classi in com.extendrent.security → 279 test, selezionati via profilo Maven
+  # -Psecurity-tests (pom.xml) con Surefire includes: **/security/*Test.java
   security-tests:
     name: Security Tests
     runs-on: ubuntu-latest
@@ -50,43 +50,7 @@ jobs:
           cache: maven
 
       - name: Run security test suite
-        run: |
-          TESTS="AccountLockoutSecurityTest,\
-          AdminControllerSecurityTest,\
-          AuthenticationControllerSecurityTest,\
-          CorsAttackerDomainSecurityTest,\
-          CorsConfigDuplicationSecurityTest,\
-          CorsSecurityTest,\
-          EmployeeControllerSecurityTest,\
-          FileUploadSecurityTest,\
-          GenericExceptionHandlerSecurityTest,\
-          HardcodedCredentialsSecurityTest,\
-          HttpOnlyCookieSecurityTest,\
-          InputValidationSecurityTest,\
-          JwtAuthFilterTest,\
-          JwtClaimsPIISecurityTest,\
-          JwtServiceTest,\
-          JwtTtlSecurityTest,\
-          LogoutSecurityTest,\
-          PasswordComplexitySecurityTest,\
-          PaymentValidationSecurityTest,\
-          RateLimitXForwardedForSecurityTest,\
-          RateLimitingBehaviorTest,\
-          RateLimitingSecurityTest,\
-          RefreshTokenLoggingSecurityTest,\
-          RefreshTokenRevocationSecurityTest,\
-          RentalControllerSecurityTest,\
-          RoleEscalationSecurityTest,\
-          SecurityFilterChainTest,\
-          SwaggerAdminOnlySecurityTest,\
-          SwaggerProdAccessSecurityTest,\
-          UserControllerSecurityTest,\
-          ValidationErrorExposureSecurityTest"
-          TESTS=$(echo "$TESTS" | tr -d ' \n')
-          mvn -B surefire:test \
-            -Dspring.profiles.active=test \
-            -Dtest="$TESTS" \
-            --no-transfer-progress
+        run: mvn -B test -Dspring.profiles.active=test -Psecurity-tests --no-transfer-progress
 
       - name: Upload security test results
         if: always()
@@ -128,13 +92,13 @@ jobs:
         with:
           project: rentACar-backend
           path: .
-          format: 'SARIF HTML'   # SARIF per GitHub Security tab; HTML per lettura umana
+          format: 'ALL'
           args: >-
             --suppression .github/owasp-suppressions.xml
             --failOnCVSS 3
             --enableRetired
         env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          NVD_API_KdiEY: ${{ secrets.NVD_API_KEY }}
 
       - name: Upload SARIF al tab Security di GitHub
         uses: github/codeql-action/upload-sarif@v3
