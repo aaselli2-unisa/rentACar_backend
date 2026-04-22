@@ -101,14 +101,25 @@ jobs:
       contents: read
       security-events: write   # necessario per upload SARIF al tab Security
     steps:
-      - name: Scan image per CVE (CRITICAL + HIGH)
+      - name: Genera SARIF (tutte le severità, per Code Scanning)
         uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ${{ needs.docker-push.outputs.image }}
           format: sarif
           output: trivy-results.sarif
+          exit-code: '0'
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Gate CRITICAL/HIGH – blocca deploy se trovati
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: ${{ needs.docker-push.outputs.image }}
+          format: table
           severity: CRITICAL,HIGH
           exit-code: '1'
+          ignore-unfixed: true
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}

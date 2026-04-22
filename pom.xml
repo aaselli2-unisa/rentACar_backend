@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.1</version>
+        <version>3.5.13</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.example</groupId>
@@ -15,10 +15,12 @@
     <description>team work project for tobeto bootcamp</description>
     <properties>
         <java.version>17</java.version>
-        <!-- Security overrides: pin versions to fix Trivy CRITICAL/HIGH CVEs -->
-        <tomcat.version>10.1.53</tomcat.version>
+        <!-- Security overrides: pin versions beyond what Spring Boot 3.5.13 ships -->
+        <tomcat.version>10.1.54</tomcat.version>
+        <spring-security.version>6.5.10</spring-security.version>
+        <postgresql.version>42.7.10</postgresql.version>
+        <logback.version>1.5.25</logback.version>
         <commons-lang3.version>3.18.0</commons-lang3.version>
-        <jackson-bom.version>2.18.6</jackson-bom.version>
     </properties>
     <dependencies>
 
@@ -26,6 +28,13 @@
             <groupId>com.cloudinary</groupId>
             <artifactId>cloudinary-http44</artifactId>
             <version>1.27.0</version>
+        </dependency>
+
+        <!-- Override httpclient transitivo da cloudinary: fix CVE-2020-13956 -->
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.14</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-text -->
