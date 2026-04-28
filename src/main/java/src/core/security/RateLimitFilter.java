@@ -50,7 +50,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return !path.startsWith("/api/v1/auth/") && !path.startsWith("/api/v1/refresh-token");
+        String method = request.getMethod();
+        boolean isAuthPath = path.startsWith("/api/v1/auth/") || path.startsWith("/api/v1/refresh-token");
+        // Security patch V15: rate-limit image upload endpoints to prevent Cloudinary storage DoS.
+        boolean isImageUpload = path.startsWith("/api/v1/images/") && "POST".equalsIgnoreCase(method);
+        return !isAuthPath && !isImageUpload;
     }
 
     @Override
