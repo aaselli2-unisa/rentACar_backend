@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import src.service.image.brand.BrandImageService;
@@ -19,6 +20,7 @@ import static src.controller.image.LogConstant.*;
 @Slf4j
 @RequestMapping("/api/v1/images")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class ImageController {
     private final CarImageService carImageService;
     private final UserImageService userImageService;

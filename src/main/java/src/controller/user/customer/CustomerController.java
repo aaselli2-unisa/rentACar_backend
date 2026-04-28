@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import src.controller.TResponse;
 import src.controller.rental.response.RentalResponse;
@@ -21,6 +22,7 @@ import static src.controller.user.customer.LogConstant.*;
 @Slf4j
 @RequestMapping("api/v1/customers")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class CustomerController {
     private final CustomerService customerService;
 
