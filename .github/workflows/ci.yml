@@ -2,139 +2,174 @@ name: CI
 
 on:
   push:
-    branches: [master-dev,master]
+    branches: [master-dev, master]
   pull_request:
     branches: [master]
+  #   workflow_dispatch: Per runnare il workflow manualmente nell'interfaccia
   workflow_dispatch:
 
-# Permessi minimi di default — ogni job eleva solo ciò che serve.
+# Per sicurezza, impostiamo il minimo indispensabile come permessi di default
+# I singoli job che hanno bisogno di più permessi li aggiungono localmente.
 permissions:
   contents: read
 
 jobs:
-  # ── 1. Compilazione ─────────────────────────────────────────────────────────
-  compile:
-    name: Compile
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
+  # JOB 1: test
+  # Questo job fa tre cose in sequenza:
+  #   1. Compila il codice Java con Maven
+  #   2. Esegue i test di sicurezza
+  #   3. Verifica che il Dockerfile sia valido (senza pubblicare l'immagine)
+  # Le tre operazioni sono nello stesso job perché sono dipendenti:
+  # se la compilazione fallisce non ha senso eseguire i test,
+  # se i test falliscono non ha senso validare Docker.
+  test:
 
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    # Timeout di sicurezza: se il job non finisce entro 30 minuti, viene
+    # interrotto automaticamente.
+    timeout-minutes: 30
+
+    steps:
+      # STEP 1: Checkout del codice
+      # "actions/checkout" è l'azione ufficiale di GitHub che clona la repo sul runner
+      - uses: actions/checkout@v6
+
+      # STEP 2: Installazione di Java
+      # "actions/setup-java" è l'azione ufficiale di GitHub che installa
+      # il JDK sul runner. Usiamo Java 17
+      # cache: maven -> salva automaticamente la cartella ~/.m2 dove Maven scarica
+      # le dipendenze tra un run e l'altro.
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: temurin
           cache: maven
 
-      - name: Compile (no tests)
+      # STEP 3: Compilazione del progetto
+      # "mvn" è Maven, il tool di build del progetto Java.
+      #   -B -> modalità batch per output minimale,
+      #   -DskipTests -> compila senza eseguire i test (che runniamo dopo)
+      #   compile -> fase di compilazione
+      #   --no-transfer-progress -> nasconde i progressi di download delle dipendenze per log più puliti
+      - name: Compile
         run: mvn -B -DskipTests compile --no-transfer-progress
 
-  # ── 2. Security Tests (OWASP patches) ───────────────────────────────
-  # Job dedicato ai test di sicurezza: fallisce la pipeline se uno fallisce.
-  # 31 classi in com.extendrent.security → 279 test, selezionati via profilo Maven
-  # -Psecurity-tests (pom.xml) con Surefire includes: **/security/*Test.java
-  security-tests:
-    name: Security Tests
-    runs-on: ubuntu-latest
-    needs: compile
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: temurin
-          cache: maven
-
-      - name: Run security test suite
+      # STEP 4: Esecuzione dei test di sicurezza
+      # Esegue i test in src/test/java/com/extendrent/security/
+      # -Psecurity-tests -> attiva il profilo Maven "security-tests"
+      # definito nel pom.xml, così eseguiamo solo i test di sicurezza
+      - name: Security tests
         run: mvn -B test -Dspring.profiles.active=test -Psecurity-tests --no-transfer-progress
 
-      - name: Upload security test results
+
+      # STEP 5: Salvataggio dei risultati dei test come artifact
+      # "if: always()" -> questo step gira SEMPRE, così possiamo analizzare i log
+      # "actions/upload-artifact" è l'azione ufficiale di GitHub per caricare un artifact.
+      - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: security-test-results
           path: target/surefire-reports/
           retention-days: 30
 
-  # ── 3. OWASP Dependency Check ────────────────────────────────────────────────
-  # Confronta tutte le dipendenze Maven (pom.xml) con il database NVD (National
-  # Vulnerability Database) di CVE pubbliche. In pratica: se stai usando una
-  # libreria con una vulnerabilità nota (es. Log4Shell in log4j), questo job
-  # la individua e fa fallire la pipeline prima che arrivi in produzione.
-  #
-  # Fallisce se trova vulnerabilità con CVSS >= 3 (HIGH o CRITICAL).
-  #
-  # Falsi positivi: se una CVE non è realmente sfruttabile nel progetto (es. la
-  # vulnerabilità riguarda una funzione che non usi), aggiungila a
-  # .github/owasp-suppressions.xml con motivazione e data di revisione.
-  # I risultati appaiono anche nel tab Security → Code scanning del repo.
-  #
-  # Nota: la prima esecuzione scarica il NVD database (~300 MB) e può richiedere
-  # alcuni minuti. Aggiungere NVD_API_KEY come secret del repo per evitare il
-  # rate-limit NVD e velocizzare i run successivi.
-  owasp-check:
+      # STEP 6: Setup di Docker BuildKit
+      # "docker/setup-buildx-action" è un'azione ufficiale di Docker che attiva
+      # BuildKit, un motore di build che ci permette di avere.
+      # Cache condivisibile tra runner diversi
+      - uses: docker/setup-buildx-action@v4
+
+
+      # STEP 7: Verifica che il Dockerfile sia valido
+      # "docker/build-push-action" è l'azione ufficiale di Docker per buildare
+      # e pushare le immagini.
+      # Noi però non pubblichiamo, usiamo l'azione solo per verificare che il Dockerfile non abbia problemi
+      # cache-from: type=gha -> legge la cache di build Docker dalla cache di GitHub Actions.
+      # cache-to: type=gha, mode=max -> salva tutti i layer della build nella cache
+      # così il prossimo run parte già con i layer cachati e impiega meno
+      - name: Docker build check (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          tags: rentacar-app:ci-check
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # JOB 2: owasp DC
+  # Questo job esegue lo strumento che analizza tutte le librerie del pom
+  # e le confronta con il database NVD (National Vulnerability Database)
+  # che è un catalogo pubblico tenuto dal governo americano con tutte CVE
+  # nelle librerie software.
+  # Questo job gira IN PARALLELO con "test" perché tanto non dipende da lui
+
+  owasp:
     name: OWASP Dependency Check
     runs-on: ubuntu-latest
-    needs: compile
+
+    # Questo job può impiegare tempo per scaricare il database NVD
     timeout-minutes: 60
+
+
+    # security-events: write -> necessario per pubblicare il report SARIF
     permissions:
       contents: read
-      security-events: write   # necessario per upload SARIF al tab Security
-    steps:
-      - uses: actions/checkout@v4
+      security-events: write
 
+    steps:
+
+      # Clona il repo
+      - uses: actions/checkout@v6
+
+      # STEP 1: Esecuzione OWASP Dependency Check
+      # "dependency-check/Dependency-Check_Action" esegue lo strumento OWASP Dependency Check.
+      # path: . -> Dove si trova il pom.xml
+      # format: ALL -> genera report in tutti i formati disponibili
+      # args:" sono argomenti aggiuntivi passati direttamente al tool:
+      # --suppression .github/owasp-suppressions.xml -> file dove sono elencati i
+      # falsi positivi da ignorare.
+      # --failOnCVSS 3 -> il job fallisce se trova vulnerabilità con punteggio
+      # CVSS (Common Vulnerability Scoring System) > 3, quindi da medium in sù
+      # --enableRetired -> include nel controllo anche le librerie unmantained,
       - name: Run OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@1.1.0
         with:
           project: rentACar-backend
           path: .
-          format: 'ALL'
+          format: ALL
           args: >-
             --suppression .github/owasp-suppressions.xml
             --failOnCVSS 3
             --enableRetired
         env:
-          NVD_API_KdiEY: ${{ secrets.NVD_API_KEY }}
+          # Chiave API per il database NVD.
+          # Senza questa chiave OWASP non possiamo generare il report nel tab Security di GitHub
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
 
+
+      # STEP 2: Pubblicazione del report nel tab Security di GitHub
+      # IN FORMATO SARIF.
+      # "github/codeql-action/upload-sarif" è l'azione ufficiale di GitHub per
+      # caricare file SARIF nella tab Code Scanning.
+      # "if: always()" -> carica il report anche se OWASP ha trovato vulnerabilità
       - name: Upload SARIF al tab Security di GitHub
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: reports/dependency-check-report.sarif
 
+
+      # STEP 3: Salvataggio di tutti i report come artifact
+      # Oltre al SARIF nel tab Security, salviamo tutti i report generati
+      # (HTML, JSON, XML, SARIF) come artifact scaricabile.
       - name: Upload report come artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: owasp-report
           path: reports/
           retention-days: 30
-
-  # ── 5. Docker Build (validazione, nessun push) ──────────────────────────────
-  # Verifica che il Dockerfile del backend compili correttamente su ogni push.
-  # Il frontend vive in un repo separato e viene buildato dal proprio pipeline.
-  # Il push su ghcr.io avviene solo nel workflow deploy.yml, dopo che tutti
-  # i job di questo CI sono andati a buon fine.
-  docker-validate:
-    name: Docker Build Check
-    runs-on: ubuntu-latest
-    needs: compile
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image (no push)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: false
-          tags: rentacar-app:ci-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
