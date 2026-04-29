@@ -100,6 +100,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+
   # JOB 2: owasp DC
   # Questo job esegue lo strumento che analizza tutte le librerie del pom
   # e le confronta con il database NVD (National Vulnerability Database)
@@ -136,7 +137,7 @@ jobs:
       # CVSS (Common Vulnerability Scoring System) > 3, quindi da medium in sù
       # --enableRetired -> include nel controllo anche le librerie unmantained,
       - name: Run OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@1.1.0
+        uses: dependency-check/Dependency-Check_Action@main
         with:
           project: rentACar-backend
           path: .
