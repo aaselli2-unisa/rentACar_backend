@@ -15,7 +15,9 @@ import src.controller.TResponse;
 import src.controller.auth.authentication.request.IsUserTrueRequest;
 import src.controller.auth.authentication.request.SignInRequest;
 import src.controller.auth.authentication.request.SignUpReqeust;
+import src.controller.user.response.UserResponse;
 import src.core.security.model.JwtToken;
+import src.repository.user.UserEntity;
 import src.service.auth.AuthenticationService;
 import src.service.external.EmailService;
 
@@ -89,6 +91,27 @@ public class AuthenticationController {
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, clearAccess.toString());
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, clearRefresh.toString());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/me")
+    ResponseEntity<TResponse<UserResponse>> me(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+        UserEntity user = (UserEntity) userDetails;
+        UserResponse userResponse = UserResponse.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .surname(user.getSurname())
+                .email(user.getEmailAddress())
+                .authority(user.getAuthority())
+                .status(user.getStatus() != null ? user.getStatus().name() : null)
+                .isDeleted(Boolean.TRUE.equals(user.getIsDeleted()))
+                .build();
+        log.info("User info requested: {}", user.getEmailAddress());
+        return new ResponseEntity<>(
+                TResponse.<UserResponse>tResponseBuilder().response(userResponse).build(),
+                HttpStatus.OK);
     }
 
     // Security patch V01: converted from GET+query-params to POST+body so the
