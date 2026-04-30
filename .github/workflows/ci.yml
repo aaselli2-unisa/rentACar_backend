@@ -5,41 +5,62 @@ on:
     branches: [master-dev, master]
   pull_request:
     branches: [master]
-  #   workflow_dispatch: Per runnare il workflow manualmente nell'interfaccia
   workflow_dispatch:
 
-# Per sicurezza, impostiamo il minimo indispensabile come permessi di default
+# Per sicurezza, impostiamo il minimo indispensabile come permessi di default.
 # I singoli job che hanno bisogno di più permessi li aggiungono localmente.
 permissions:
   contents: read
 
 jobs:
-  # JOB 1: test
-  # Questo job fa tre cose in sequenza:
-  #   1. Compila il codice Java con Maven
-  #   2. Esegue i test di sicurezza
-  #   3. Verifica che il Dockerfile sia valido (senza pubblicare l'immagine)
-  # Le tre operazioni sono nello stesso job perché sono dipendenti:
-  # se la compilazione fallisce non ha senso eseguire i test,
-  # se i test falliscono non ha senso validare Docker.
-  test:
 
-    name: Build & Test
+  # JOB 1: gitguardian
+  # Scansiona ogni push/PR cercando segreti hardcoded (API key, token, password)
+  # nei file sorgente e nella storia dei commit prima che arrivino su master.
+  # Non dipende dalla compilazione perché lavora direttamente sui file git,
+  # non sul bytecode. Per questo gira in parallelo con compile senza aspettarlo.
+  gitguardian:
+    name: GitGuardian Secret Scan
     runs-on: ubuntu-latest
-
-    # Timeout di sicurezza: se il job non finisce entro 30 minuti, viene
-    # interrotto automaticamente.
-    timeout-minutes: 30
-
+    timeout-minutes: 5
     steps:
-      # STEP 1: Checkout del codice
-      # "actions/checkout" è l'azione ufficiale di GitHub che clona la repo sul runner
+      # "actions/checkout" è l'azione ufficiale di GitHub che clona la repo sul runner.
+      # fetch-depth: 0 → clona tutta la storia dei commit, non solo l'ultimo.
+      # GitGuardian ne ha bisogno per scansionare tutti i commit inclusi nel push.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # "GitGuardian/ggshield-action" esegue lo strumento ggshield che analizza
+      # ogni commit alla ricerca di pattern corrispondenti a segreti noti
+      # (oltre 350 tipi: AWS, GCP, Stripe, JWT, ecc.).
+      # Le variabili GITHUB_* servono a ggshield per sapere quali commit
+      # scansionare in base al tipo di evento (push o pull_request).
+      - name: Scan for secrets
+        uses: GitGuardian/ggshield-action@v1
+        env:
+          GITHUB_PUSH_BEFORE_SHA:  ${{ github.event.before }}
+          GITHUB_PUSH_BASE_SHA:    ${{ github.event.base }}
+          GITHUB_PULL_BASE_SHA:    ${{ github.event.pull_request.base.sha }}
+          GITHUB_DEFAULT_BRANCH:   ${{ github.event.repository.default_branch }}
+          GITGUARDIAN_API_KEY:     ${{ secrets.GITGUARDIAN_API_KEY }}
+
+
+  # JOB 2: compile
+  # Gate iniziale: verifica che il codice Java compili prima di avviare
+  # i job downstream. Se la build è rotta, tutti i job che dichiarano
+  # "needs: compile" vengono saltati automaticamente senza sprecare runner.
+  compile:
+    name: Compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # "actions/checkout" è l'azione ufficiale di GitHub che clona la repo sul runner.
       - uses: actions/checkout@v6
 
-      # STEP 2: Installazione di Java
       # "actions/setup-java" è l'azione ufficiale di GitHub che installa
-      # il JDK sul runner. Usiamo Java 17
-      # cache: maven -> salva automaticamente la cartella ~/.m2 dove Maven scarica
+      # il JDK sul runner. Usiamo Java 17.
+      # cache: maven → salva automaticamente la cartella ~/.m2 dove Maven scarica
       # le dipendenze tra un run e l'altro.
       - name: Setup Java 17
         uses: actions/setup-java@v5
@@ -48,27 +69,48 @@ jobs:
           distribution: temurin
           cache: maven
 
-      # STEP 3: Compilazione del progetto
       # "mvn" è Maven, il tool di build del progetto Java.
-      #   -B -> modalità batch per output minimale,
-      #   -DskipTests -> compila senza eseguire i test (che runniamo dopo)
-      #   compile -> fase di compilazione
-      #   --no-transfer-progress -> nasconde i progressi di download delle dipendenze per log più puliti
+      #   -B                    → modalità batch per output minimale
+      #   -DskipTests           → compila senza eseguire i test (che runniamo dopo)
+      #   compile               → fase di compilazione
+      #   --no-transfer-progress → nasconde i progressi di download per log più puliti
       - name: Compile
         run: mvn -B -DskipTests compile --no-transfer-progress
 
 
-      # STEP 4: Esecuzione dei test di sicurezza
-      # Esegue i test in src/test/java/com/extendrent/security/
-      # -Psecurity-tests -> attiva il profilo Maven "security-tests"
-      # definito nel pom.xml, così eseguiamo solo i test di sicurezza
-      - name: Security tests
+  # JOB 3: security-tests
+  # Esegue la suite di test di sicurezza del progetto.
+  # Usa il profilo Maven "security-tests" definito nel pom.xml così eseguiamo
+  # solo i test in src/test/java/.../security/ senza girare tutta la suite.
+  # I report Surefire salvati come artifact vengono scaricati da SonarCloud
+  # per calcolare la coverage senza dover rieseguire i test.
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: compile
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      # -Psecurity-tests           → attiva il profilo Maven "security-tests"
+      #                              definito nel pom.xml, così eseguiamo solo
+      #                              i test di sicurezza
+      # -Dspring.profiles.active=test → attiva il profilo Spring "test" che usa
+      #                              application-test.properties (DB in-memory)
+      - name: Run security tests
         run: mvn -B test -Dspring.profiles.active=test -Psecurity-tests --no-transfer-progress
 
-
-      # STEP 5: Salvataggio dei risultati dei test come artifact
-      # "if: always()" -> questo step gira SEMPRE, così possiamo analizzare i log
-      # "actions/upload-artifact" è l'azione ufficiale di GitHub per caricare un artifact.
+      # "if: always()" → questo step gira SEMPRE, così possiamo analizzare i log
+      # anche quando i test falliscono.
+      # "actions/upload-artifact" è l'azione ufficiale di GitHub per caricare
+      # un artifact scaricabile dalla pagina del workflow.
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -77,20 +119,126 @@ jobs:
           path: target/surefire-reports/
           retention-days: 30
 
-      # STEP 6: Setup di Docker BuildKit
+
+  # JOB 4: snyk
+  # SCA (Software Composition Analysis): legge il pom.xml e confronta ogni
+  # dipendenza Maven con il database CVE di Snyk.
+  # Sostituisce OWASP Dependency Check: stesso dominio (dipendenze vulnerabili),
+  # niente NVD_API_KEY, ~3 minuti di esecuzione invece di 60.
+  # Blocca il CI se trova CVE di severità medium o superiore.
+  # I risultati appaiono nel tab Security → Code scanning del repo.
+  snyk:
+    name: Snyk Dependency Scan
+    runs-on: ubuntu-latest
+    needs: compile
+    timeout-minutes: 15
+    # security-events: write → necessario per pubblicare il report SARIF
+    # nel tab Security → Code scanning di GitHub.
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      # "snyk/actions/maven" esegue "snyk test" sul progetto Maven.
+      # Snyk risolve l'albero delle dipendenze dal pom.xml e confronta ogni
+      # libreria con il suo database CVE, aggiornato più frequentemente di NVD.
+      #   --severity-threshold=medium → fallisce solo su CVE medium/high/critical,
+      #                                 ignora i low per ridurre il rumore
+      #   --sarif-file-output         → salva il report in formato SARIF per GitHub
+      # continue-on-error: true → permette l'upload del SARIF anche se Snyk trova
+      # vulnerabilità. Il job fallisce esplicitamente nello step Gate successivo.
+      - name: Run Snyk
+        id: snyk
+        uses: snyk/actions/maven@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=medium --sarif-file-output=snyk.sarif
+
+      # "github/codeql-action/upload-sarif" è l'azione ufficiale di GitHub per
+      # caricare file SARIF nella tab Security → Code scanning.
+      # "if: always()" → carica il report anche se Snyk ha trovato vulnerabilità.
+      - name: Upload SARIF al tab Security di GitHub
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: snyk.sarif
+
+      # Step separato che fa fallire il job dopo l'upload del SARIF.
+      # Senza questo step, con continue-on-error il job risulterebbe sempre verde.
+      - name: Gate — blocca se trovate CVE medium/high/critical
+        if: steps.snyk.outcome == 'failure'
+        run: exit 1
+
+
+  # JOB 5: semgrep
+  # SAST (Static Application Security Testing): analizza il codice sorgente Java
+  # alla ricerca di pattern insicuri (injection, XSS, SSRF, ecc.)
+  # con il ruleset ufficiale Semgrep per Java.
+  # Non blocca il CI: i SAST producono falsi positivi che vanno revisionati
+  # manualmente prima di attivare il gate. I risultati sono visibili
+  # nel tab Security → Code scanning.
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    needs: compile
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+
+      # Installa semgrep via pip ed esegue l'analisi sul sorgente Java.
+      #   --config=p/java → ruleset ufficiale Semgrep per Java, mantenuto
+      #                     dalla community e aggiornato automaticamente
+      #   --sarif          → output in formato SARIF per GitHub
+      #   || true          → non blocca il CI: attivare il gate dopo aver
+      #                     revisionato i risultati nel tab Security
+      - name: Run Semgrep
+        run: |
+          pip install semgrep --quiet
+          semgrep --config=p/java --sarif --output=semgrep.sarif src/main/java/ || true
+
+      - name: Upload SARIF al tab Security di GitHub
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep.sarif
+
+
+  # JOB 6: docker-validate
+  # Verifica che il Dockerfile compili correttamente senza pubblicare l'immagine.
+  # Blocca il merge di modifiche che rompono la build Docker prima che arrivino
+  # nel CD, dove l'immagine verrebbe pushata su ghcr.io.
+  docker-validate:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    needs: compile
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
       # "docker/setup-buildx-action" è un'azione ufficiale di Docker che attiva
-      # BuildKit, un motore di build che ci permette di avere.
-      # Cache condivisibile tra runner diversi
+      # BuildKit, un motore di build avanzato.
+      # Cache condivisibile tra runner diversi → build successive più veloci.
       - uses: docker/setup-buildx-action@v4
 
-
-      # STEP 7: Verifica che il Dockerfile sia valido
       # "docker/build-push-action" è l'azione ufficiale di Docker per buildare
-      # e pushare le immagini.
-      # Noi però non pubblichiamo, usiamo l'azione solo per verificare che il Dockerfile non abbia problemi
-      # cache-from: type=gha -> legge la cache di build Docker dalla cache di GitHub Actions.
-      # cache-to: type=gha, mode=max -> salva tutti i layer della build nella cache
-      # così il prossimo run parte già con i layer cachati e impiega meno
+      # e pushare le immagini. Noi non pubblichiamo: usiamo l'azione solo per
+      # verificare che il Dockerfile non abbia problemi.
+      # cache-from: type=gha → legge la cache di build Docker dalla cache di GitHub Actions
+      # cache-to: type=gha,mode=max → salva tutti i layer così il prossimo run
+      #                               parte già con i layer cachati
       - name: Docker build check (no push)
         uses: docker/build-push-action@v7
         with:
@@ -101,76 +249,54 @@ jobs:
           cache-to: type=gha,mode=max
 
 
-  # JOB 2: owasp DC
-  # Questo job esegue lo strumento che analizza tutte le librerie del pom
-  # e le confronta con il database NVD (National Vulnerability Database)
-  # che è un catalogo pubblico tenuto dal governo americano con tutte CVE
-  # nelle librerie software.
-  # Questo job gira IN PARALLELO con "test" perché tanto non dipende da lui
-
-  owasp:
-    name: OWASP Dependency Check
+  # JOB 7: sonarcloud
+  # SAST + metriche di qualità + code coverage.
+  # Aspetta security-tests per due motivi:
+  #   1. Non parte se i test falliscono (quality gate implicito).
+  #   2. Scarica i report Surefire per la coverage senza rieseguire i test.
+  # Richiede sonar-maven-plugin nel pom.xml e le variabili SONAR_ORGANIZATION
+  # e SONAR_PROJECT_KEY configurate nelle GitHub Variables del repo.
+  sonarcloud:
+    name: SonarCloud Analysis
     runs-on: ubuntu-latest
-
-    # Questo job può impiegare tempo per scaricare il database NVD
-    timeout-minutes: 60
-
-
-    # security-events: write -> necessario per pubblicare il report SARIF
-    permissions:
-      contents: read
-      security-events: write
-
+    needs: security-tests
+    timeout-minutes: 15
     steps:
-
-      # Clona il repo
+      # fetch-depth: 0 → SonarCloud usa la storia completa dei commit per il blame
+      # e per identificare le nuove issue introdotte nel PR corrente.
       - uses: actions/checkout@v6
-
-      # STEP 1: Esecuzione OWASP Dependency Check
-      # "dependency-check/Dependency-Check_Action" esegue lo strumento OWASP Dependency Check.
-      # path: . -> Dove si trova il pom.xml
-      # format: ALL -> genera report in tutti i formati disponibili
-      # args:" sono argomenti aggiuntivi passati direttamente al tool:
-      # --suppression .github/owasp-suppressions.xml -> file dove sono elencati i
-      # falsi positivi da ignorare.
-      # --failOnCVSS 3 -> il job fallisce se trova vulnerabilità con punteggio
-      # CVSS (Common Vulnerability Scoring System) > 3, quindi da medium in sù
-      # --enableRetired -> include nel controllo anche le librerie unmantained,
-      - name: Run OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
         with:
-          project: rentACar-backend
-          path: .
-          format: ALL
-          args: >-
-            --suppression .github/owasp-suppressions.xml
-            --failOnCVSS 3
-            --enableRetired
+          fetch-depth: 0
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      # Scarica i report Surefire generati da security-tests nell'artifact.
+      # SonarCloud li legge per calcolare la coverage senza rieseguire i test.
+      - name: Download test results
+        uses: actions/download-artifact@v4
+        with:
+          name: security-test-results
+          path: target/surefire-reports/
+
+      # "mvn sonar:sonar" esegue il plugin SonarScanner for Maven che invia
+      # il codice sorgente, i bytecode e i report di test a SonarCloud.
+      #   -DskipTests             → non riesegue i test, usa quelli scaricati
+      #   sonar.organization      → nome dell'organizzazione su SonarCloud
+      #   sonar.projectKey        → identificatore unico del progetto su SonarCloud
+      #   sonar.host.url          → endpoint SonarCloud (versione hosted di SonarQube)
+      # Il token è letto automaticamente dalla variabile d'ambiente SONAR_TOKEN.
+      - name: SonarCloud analysis
         env:
-          # Chiave API per il database NVD.
-          # Senza questa chiave OWASP non possiamo generare il report nel tab Security di GitHub
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-
-
-      # STEP 2: Pubblicazione del report nel tab Security di GitHub
-      # IN FORMATO SARIF.
-      # "github/codeql-action/upload-sarif" è l'azione ufficiale di GitHub per
-      # caricare file SARIF nella tab Code Scanning.
-      # "if: always()" -> carica il report anche se OWASP ha trovato vulnerabilità
-      - name: Upload SARIF al tab Security di GitHub
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: reports/dependency-check-report.sarif
-
-
-      # STEP 3: Salvataggio di tutti i report come artifact
-      # Oltre al SARIF nel tab Security, salviamo tutti i report generati
-      # (HTML, JSON, XML, SARIF) come artifact scaricabile.
-      - name: Upload report come artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: owasp-report
-          path: reports/
-          retention-days: 30
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          mvn -B compile sonar:sonar
+          -DskipTests
+          -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+          -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+          -Dsonar.host.url=https://sonarcloud.io
+          --no-transfer-progress
