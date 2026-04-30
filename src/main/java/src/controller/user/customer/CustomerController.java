@@ -35,6 +35,7 @@ public class CustomerController {
     }
 
     @PutMapping
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('CUSTOMER') and #updateCustomerRequest.id == authentication.principal.id)")
     public ResponseEntity<TResponse<CustomerResponse>> updateCustomer(@RequestBody UpdateCustomerRequest updateCustomerRequest) {
         log.info(UPDATING_CUSTOMER, updateCustomerRequest.toString());
         CustomerResponse updatedCustomer = this.customerService.update(updateCustomerRequest);
@@ -79,6 +80,7 @@ public class CustomerController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('CUSTOMER') and #id == authentication.principal.id)")
     public ResponseEntity<TResponse<CustomerResponse>> getById(@PathVariable int id) {
         log.info(GETTING_CUSTOMER_BY_ID, id);
         CustomerResponse customer = this.customerService.getById(id);
@@ -90,6 +92,7 @@ public class CustomerController {
     }
 
     @GetMapping("/rentals/{customerId}")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('CUSTOMER') and #customerId == authentication.principal.id)")
     public ResponseEntity<TResponse<List<RentalResponse>>> getRentalHistory(@PathVariable int customerId) {
         log.info(GETTING_RENTAL_HISTORY, customerId);
         List<RentalResponse> rentalHistory = this.customerService.getRentalHistory(customerId);
