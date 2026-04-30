@@ -28,7 +28,6 @@ public class UpdateCustomerRequest {
     @Email//-> Validates email format (e.g. @gmail, @hotmail).
     private String emailAddress;
 
-    @NotBlank(message = "Customer password cannot be blank")
     @Size(min = 8, max = 30)
     private String password;
 
