@@ -147,22 +147,23 @@ jobs:
           distribution: temurin
           cache: maven
 
-      # "snyk/actions/maven" esegue "snyk test" sul progetto Maven.
-      # Snyk risolve l'albero delle dipendenze dal pom.xml e confronta ogni
-      # libreria con il suo database CVE, aggiornato più frequentemente di NVD.
-      #   --severity-threshold=medium → fallisce solo su CVE medium/high/critical,
-      #                                 ignora i low per ridurre il rumore
-      #   --sarif-file-output         → salva il report in formato SARIF per GitHub
-      # continue-on-error: true → permette l'upload del SARIF anche se Snyk trova
-      # vulnerabilità. Il job fallisce esplicitamente nello step Gate successivo.
+      # snyk/actions/setup installa il CLI Snyk sul runner (senza Docker).
+      # Approccio ufficiale: evita il conflitto JAVA_HOME che si verifica con
+      # snyk/actions/maven, che gira in un container dove il path del runner non esiste.
+      - name: Setup Snyk
+        uses: snyk/actions/setup@master
+
+      # snyk test analizza il pom.xml e confronta le dipendenze con il database CVE Snyk.
+      #   --severity-threshold=medium → ignora CVE low, fallisce su medium/high/critical
+      #   --sarif-file-output         → salva il report SARIF per il tab Security di GitHub
+      # continue-on-error: true → permette l'upload del SARIF anche se trova CVE.
+      # Il job fallisce esplicitamente nello step Gate successivo.
       - name: Run Snyk
         id: snyk
-        uses: snyk/actions/maven@master
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=medium --sarif-file-output=snyk.sarif
+        run: snyk test --severity-threshold=medium --sarif-file-output=snyk.sarif
 
       # "github/codeql-action/upload-sarif" è l'azione ufficiale di GitHub per
       # caricare file SARIF nella tab Security → Code scanning.
