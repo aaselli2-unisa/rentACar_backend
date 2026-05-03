@@ -13,37 +13,26 @@ permissions:
   contents: read
 
 jobs:
-
   # JOB 1: gitguardian
-  # Scansiona ogni push/PR cercando segreti hardcoded (API key, token, password)
-  # nei file sorgente e nella storia dei commit prima che arrivino su master.
-  # Non dipende dalla compilazione perché lavora direttamente sui file git,
-  # non sul bytecode. Per questo gira in parallelo con compile senza aspettarlo.
+  # Scansiona l'intera storia del progetto cercando segreti hardcoded.
+  # "secret scan commit-range" scansiona tutti i commit da 1ac75a2 (primo commit
+  # nostro del progetto) fino a HEAD, così trova segreti già presenti nel repo,
+  # non solo quelli introdotti nell'ultimo push.
   gitguardian:
     name: GitGuardian Secret Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      # "actions/checkout" è l'azione ufficiale di GitHub che clona la repo sul runner.
-      # fetch-depth: 0 → clona tutta la storia dei commit, non solo l'ultimo.
-      # GitGuardian ne ha bisogno per scansionare tutti i commit inclusi nel push.
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      # "GitGuardian/ggshield-action" esegue lo strumento ggshield che analizza
-      # ogni commit alla ricerca di pattern corrispondenti a segreti noti
-      # (oltre 350 tipi: AWS, GCP, Stripe, JWT, ecc.).
-      # Le variabili GITHUB_* servono a ggshield per sapere quali commit
-      # scansionare in base al tipo di evento (push o pull_request).
-      - name: Scan for secrets
+      - name: Scan secrets — full history
         uses: GitGuardian/ggshield-action@v1
+        with:
+          args: secret scan commit-range 1ac75a2..HEAD
         env:
-          GITHUB_PUSH_BEFORE_SHA:  ${{ github.event.before }}
-          GITHUB_PUSH_BASE_SHA:    ${{ github.event.base }}
-          GITHUB_PULL_BASE_SHA:    ${{ github.event.pull_request.base.sha }}
-          GITHUB_DEFAULT_BRANCH:   ${{ github.event.repository.default_branch }}
-          GITGUARDIAN_API_KEY:     ${{ secrets.GITGUARDIAN_API_KEY }}
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
 
 
   # JOB 2: compile
@@ -123,9 +112,7 @@ jobs:
   # JOB 4: snyk
   # SCA (Software Composition Analysis): legge il pom.xml e confronta ogni
   # dipendenza Maven con il database CVE di Snyk.
-  # Sostituisce OWASP Dependency Check: stesso dominio (dipendenze vulnerabili),
-  # niente NVD_API_KEY, ~3 minuti di esecuzione invece di 60.
-  # Blocca il CI se trova CVE di severità medium o superiore.
+  # Blocca il CI se trova CVE di severità low o superiore.
   # I risultati appaiono nel tab Security → Code scanning del repo.
   snyk:
     name: Snyk Dependency Scan
@@ -154,8 +141,8 @@ jobs:
         uses: snyk/actions/setup@master
 
       # snyk test analizza il pom.xml e confronta le dipendenze con il database CVE Snyk.
-      #   --severity-threshold=medium → ignora CVE low, fallisce su medium/high/critical
-      #   --sarif-file-output         → salva il report SARIF per il tab Security di GitHub
+      #   --severity-threshold=low → fallisce su qualsiasi CVE, anche i low
+      #   --sarif-file-output      → salva il report SARIF per il tab Security di GitHub
       # continue-on-error: true → permette l'upload del SARIF anche se trova CVE.
       # Il job fallisce esplicitamente nello step Gate successivo.
       - name: Run Snyk
@@ -163,20 +150,15 @@ jobs:
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: snyk test --severity-threshold=medium --sarif-file-output=snyk.sarif
+        run: snyk test --severity-threshold=low --sarif-file-output=snyk.sarif
 
-      # "github/codeql-action/upload-sarif" è l'azione ufficiale di GitHub per
-      # caricare file SARIF nella tab Security → Code scanning.
-      # "if: always()" → carica il report anche se Snyk ha trovato vulnerabilità.
       - name: Upload SARIF al tab Security di GitHub
         if: always() && hashFiles('snyk.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: snyk.sarif
 
-      # Step separato che fa fallire il job dopo l'upload del SARIF.
-      # Senza questo step, con continue-on-error il job risulterebbe sempre verde.
-      - name: Gate — blocca se trovate CVE medium/high/critical
+      - name: Gate — blocca se trovate CVE
         if: steps.snyk.outcome == 'failure'
         run: exit 1
 
@@ -185,9 +167,7 @@ jobs:
   # SAST (Static Application Security Testing): analizza il codice sorgente Java
   # alla ricerca di pattern insicuri (injection, XSS, SSRF, ecc.)
   # con il ruleset ufficiale Semgrep per Java.
-  # Non blocca il CI: i SAST producono falsi positivi che vanno revisionati
-  # manualmente prima di attivare il gate. I risultati sono visibili
-  # nel tab Security → Code scanning.
+  # Blocca il CI su qualsiasi finding. I risultati appaiono nel tab Security → Code scanning.
   semgrep:
     name: Semgrep SAST
     runs-on: ubuntu-latest
@@ -200,18 +180,16 @@ jobs:
       - uses: actions/checkout@v6
 
       # Installa semgrep via pip ed esegue l'analisi sul sorgente Java.
-      #   --config=p/java → ruleset ufficiale Semgrep per Java, mantenuto
-      #                     dalla community e aggiornato automaticamente
-      #   --sarif          → output in formato SARIF per GitHub
-      #   || true          → non blocca il CI: attivare il gate dopo aver
-      #                     revisionato i risultati nel tab Security
+      #   --config=p/java → ruleset ufficiale Semgrep per Java
+      #   --sarif         → output in formato SARIF per il tab Security di GitHub
+      # Exit code 1 se trova findings → blocca il CI.
       - name: Run Semgrep
         run: |
           pip install semgrep --quiet
-          semgrep --config=p/java --sarif --output=semgrep.sarif src/main/java/ || true
+          semgrep --config=p/java --sarif --output=semgrep.sarif src/main/java/
 
       - name: Upload SARIF al tab Security di GitHub
-        if: always()
+        if: always() && hashFiles('semgrep.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: semgrep.sarif
