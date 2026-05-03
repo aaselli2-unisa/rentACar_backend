@@ -30,7 +30,7 @@ jobs:
       - name: Scan secrets — full history
         uses: GitGuardian/ggshield-action@v1
         with:
-          args: secret scan commit-range 1ac75a2..HEAD
+          args: commit-range 1ac75a2..HEAD
         env:
           GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
 
@@ -186,7 +186,7 @@ jobs:
       - name: Run Semgrep
         run: |
           pip install semgrep --quiet
-          semgrep --config=p/java --sarif --output=semgrep.sarif src/main/java/
+          semgrep --config=p/java --config=p/java-security-audit --sarif --output=semgrep.sarif src/main/java/
 
       - name: Upload SARIF al tab Security di GitHub
         if: always() && hashFiles('semgrep.sarif') != ''
@@ -278,4 +278,5 @@ jobs:
           -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
           -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
           -Dsonar.host.url=https://sonarcloud.io
+          "-Dsonar.branch.longLivedBranches.regex=(master|master-dev|develop|main)"
           --no-transfer-progress
