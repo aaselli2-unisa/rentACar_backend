@@ -184,6 +184,8 @@ jobs:
       #   --sarif         → output in formato SARIF per il tab Security di GitHub
       # Exit code 1 se trova findings → blocca il CI.
       - name: Run Semgrep
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
         run: |
           pip install semgrep --quiet
           semgrep --config=p/java --config=p/java-security-audit --sarif --output=semgrep.sarif src/main/java/
