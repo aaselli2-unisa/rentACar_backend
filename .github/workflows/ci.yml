@@ -60,13 +60,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # "actions/checkout" è l'azione ufficiale di GitHub che clona la repo sul runner.
       - uses: actions/checkout@v6
 
-      # "actions/setup-java" è l'azione ufficiale di GitHub che installa
-      # il JDK sul runner. Usiamo Java 17.
-      # cache: maven → salva automaticamente la cartella ~/.m2 dove Maven scarica
-      # le dipendenze tra un run e l'altro.
       - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
@@ -74,11 +69,6 @@ jobs:
           distribution: temurin
           cache: maven
 
-      # "mvn" è Maven, il tool di build del progetto Java.
-      #   -B                    → modalità batch per output minimale
-      #   -DskipTests           → compila senza eseguire i test (che runniamo dopo)
-      #   compile               → fase di compilazione
-      #   --no-transfer-progress → nasconde i progressi di download per log più puliti
       - name: Compile
         run: mvn -B -DskipTests compile --no-transfer-progress
 
@@ -104,18 +94,9 @@ jobs:
           distribution: temurin
           cache: maven
 
-      # -Psecurity-tests           → attiva il profilo Maven "security-tests"
-      #                              definito nel pom.xml, così eseguiamo solo
-      #                              i test di sicurezza
-      # -Dspring.profiles.active=test → attiva il profilo Spring "test" che usa
-      #                              application-test.properties (DB in-memory)
       - name: Run security tests
         run: mvn -B test -Dspring.profiles.active=test -Psecurity-tests --no-transfer-progress
 
-      # "if: always()" → questo step gira SEMPRE, così possiamo analizzare i log
-      # anche quando i test falliscono.
-      # "actions/upload-artifact" è l'azione ufficiale di GitHub per caricare
-      # un artifact scaricabile dalla pagina del workflow.
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -136,8 +117,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: compile
     timeout-minutes: 15
-    # security-events: write → necessario per pubblicare il report SARIF
-    # nel tab Security → Code scanning di GitHub.
     permissions:
       contents: read
       security-events: write
@@ -151,19 +130,9 @@ jobs:
           distribution: temurin
           cache: maven
 
-      # snyk/actions/setup installa il CLI Snyk sul runner (senza Docker).
-      # Approccio ufficiale: evita il conflitto JAVA_HOME che si verifica con
-      # snyk/actions/maven, che gira in un container dove il path del runner non esiste.
       - name: Setup Snyk
         uses: snyk/actions/setup@master
 
-      # snyk test analizza il pom.xml e confronta le dipendenze con il database CVE Snyk.
-      # Step 1: --severity-threshold=low → SARIF con TUTTE le CVE (low+) per visibilità
-      #         nel tab Security → Code scanning del repo. continue-on-error: true
-      #         perché low/medium non devono bloccare la CI.
-      # Step 2: Upload SARIF → mostra tutte le CVE nel tab Security.
-      # Step 3 (gate): --severity-threshold=high --fail-on=upgradable → blocca solo
-      #         su HIGH/CRITICAL con patch disponibile, che vanno effettivamente risolte.
       - name: Run Snyk — scansione completa per visibilità
         continue-on-error: true
         env:
@@ -185,7 +154,7 @@ jobs:
   # JOB 5: semgrep
   # SAST (Static Application Security Testing): analizza il codice sorgente Java
   # alla ricerca di pattern insicuri (injection, XSS, SSRF, ecc.)
-  # con il ruleset ufficiale Semgrep per Java.
+  # Regole gestite da semgrep.dev tramite SEMGREP_APP_TOKEN (account richiesto).
   # Blocca il CI su qualsiasi finding. I risultati appaiono nel tab Security → Code scanning.
   semgrep:
     name: Semgrep SAST
@@ -198,17 +167,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Usa l'action ufficiale Semgrep: gestisce auth, rule fetch e SARIF internamente.
-      # SEMGREP_APP_TOKEN → accesso ai ruleset p/ dal registry semgrep.dev.
-      # publishToken → pubblica risultati nel tab Security di GitHub via SARIF.
       - name: Run Semgrep
-        uses: semgrep/semgrep-action@v1
-        with:
-          publishToken: ${{ secrets.GITHUB_TOKEN }}
-          publishDeployment: ${{ github.run_id }}
-          generateSarif: "1"
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          pip install semgrep --quiet
+          semgrep ci --sarif --output=semgrep.sarif
 
       - name: Upload SARIF al tab Security di GitHub
         if: always() && hashFiles('semgrep.sarif') != ''
@@ -229,17 +193,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # "docker/setup-buildx-action" è un'azione ufficiale di Docker che attiva
-      # BuildKit, un motore di build avanzato.
-      # Cache condivisibile tra runner diversi → build successive più veloci.
       - uses: docker/setup-buildx-action@v4
 
-      # "docker/build-push-action" è l'azione ufficiale di Docker per buildare
-      # e pushare le immagini. Noi non pubblichiamo: usiamo l'azione solo per
-      # verificare che il Dockerfile non abbia problemi.
-      # cache-from: type=gha → legge la cache di build Docker dalla cache di GitHub Actions
-      # cache-to: type=gha,mode=max → salva tutti i layer così il prossimo run
-      #                               parte già con i layer cachati
       - name: Docker build check (no push)
         uses: docker/build-push-action@v7
         with:
@@ -263,8 +218,6 @@ jobs:
     needs: security-tests
     timeout-minutes: 15
     steps:
-      # fetch-depth: 0 → SonarCloud usa la storia completa dei commit per il blame
-      # e per identificare le nuove issue introdotte nel PR corrente.
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -276,21 +229,12 @@ jobs:
           distribution: temurin
           cache: maven
 
-      # Scarica i report Surefire generati da security-tests nell'artifact.
-      # SonarCloud li legge per calcolare la coverage senza rieseguire i test.
       - name: Download test results
         uses: actions/download-artifact@v8
         with:
           name: security-test-results
           path: target/surefire-reports/
 
-      # "mvn sonar:sonar" esegue il plugin SonarScanner for Maven che invia
-      # il codice sorgente, i bytecode e i report di test a SonarCloud.
-      #   -DskipTests             → non riesegue i test, usa quelli scaricati
-      #   sonar.organization      → nome dell'organizzazione su SonarCloud
-      #   sonar.projectKey        → identificatore unico del progetto su SonarCloud
-      #   sonar.host.url          → endpoint SonarCloud (versione hosted di SonarQube)
-      # Il token è letto automaticamente dalla variabile d'ambiente SONAR_TOKEN.
       - name: SonarCloud analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
