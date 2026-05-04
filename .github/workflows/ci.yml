@@ -179,16 +179,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Installa semgrep via pip ed esegue l'analisi sul sorgente Java.
-      #   --config=p/java → ruleset ufficiale Semgrep per Java
-      #   --sarif         → output in formato SARIF per il tab Security di GitHub
-      # Exit code 1 se trova findings → blocca il CI.
+      # Usa l'action ufficiale Semgrep: gestisce auth, rule fetch e SARIF internamente.
+      # SEMGREP_APP_TOKEN → accesso ai ruleset p/ dal registry semgrep.dev.
+      # publishToken → pubblica risultati nel tab Security di GitHub via SARIF.
       - name: Run Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          publishToken: ${{ secrets.GITHUB_TOKEN }}
+          publishDeployment: ${{ github.run_id }}
+          generateSarif: "1"
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
-        run: |
-          pip install semgrep --quiet
-          semgrep --config=p/java --config=p/java-security-audit --sarif --output=semgrep.sarif src/main/java/
 
       - name: Upload SARIF al tab Security di GitHub
         if: always() && hashFiles('semgrep.sarif') != ''
