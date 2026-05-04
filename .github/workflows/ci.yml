@@ -15,22 +15,38 @@ permissions:
 jobs:
   # JOB 1: gitguardian
   # Scansiona l'intera storia del progetto cercando segreti hardcoded.
-  # "secret scan commit-range" scansiona tutti i commit da 1ac75a2 (primo commit
-  # nostro del progetto) fino a HEAD, così trova segreti già presenti nel repo,
-  # non solo quelli introdotti nell'ultimo push.
+  # Usa ggshield CLI direttamente (più stabile dell'action deprecata).
+  # "secret scan path --recursive" genera SARIF per il tab Security.
+  # "secret scan repo ." scansiona tutta la storia: blocca se trova segreti.
   gitguardian:
     name: GitGuardian Secret Scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Scan secrets — full history
-        uses: GitGuardian/ggshield-action@v1
+      - name: Install ggshield
+        run: pip install ggshield
+
+      - name: Scan secrets — genera SARIF
+        run: ggshield secret scan path . --recursive --format sarif --output gitguardian.sarif || true
+        env:
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
+
+      - name: Upload SARIF al tab Security di GitHub
+        if: hashFiles('gitguardian.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          args: commit-range 1ac75a2..HEAD
+          sarif_file: gitguardian.sarif
+          category: gitguardian
+
+      - name: Scan secrets — blocca se trova segreti (full history)
+        run: ggshield secret scan repo .
         env:
           GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
 
@@ -112,7 +128,8 @@ jobs:
   # JOB 4: snyk
   # SCA (Software Composition Analysis): legge il pom.xml e confronta ogni
   # dipendenza Maven con il database CVE di Snyk.
-  # Blocca il CI se trova CVE di severità low o superiore.
+  # Scansione low+ per visibilità completa nel tab Security.
+  # Gate blocca solo su HIGH/CRITICAL con fix disponibile (upgradable).
   # I risultati appaiono nel tab Security → Code scanning del repo.
   snyk:
     name: Snyk Dependency Scan
@@ -141,12 +158,13 @@ jobs:
         uses: snyk/actions/setup@master
 
       # snyk test analizza il pom.xml e confronta le dipendenze con il database CVE Snyk.
-      #   --severity-threshold=low → fallisce su qualsiasi CVE, anche i low
-      #   --sarif-file-output      → salva il report SARIF per il tab Security di GitHub
-      # continue-on-error: true → permette l'upload del SARIF anche se trova CVE.
-      # Il job fallisce esplicitamente nello step Gate successivo.
-      - name: Run Snyk
-        id: snyk
+      # Step 1: --severity-threshold=low → SARIF con TUTTE le CVE (low+) per visibilità
+      #         nel tab Security → Code scanning del repo. continue-on-error: true
+      #         perché low/medium non devono bloccare la CI.
+      # Step 2: Upload SARIF → mostra tutte le CVE nel tab Security.
+      # Step 3 (gate): --severity-threshold=high --fail-on=upgradable → blocca solo
+      #         su HIGH/CRITICAL con patch disponibile, che vanno effettivamente risolte.
+      - name: Run Snyk — scansione completa per visibilità
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -158,9 +176,10 @@ jobs:
         with:
           sarif_file: snyk.sarif
 
-      - name: Gate — blocca se trovate CVE
-        if: steps.snyk.outcome == 'failure'
-        run: exit 1
+      - name: Gate — blocca solo su HIGH/CRITICAL con fix disponibile
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: snyk test --severity-threshold=high --fail-on=upgradable
 
 
   # JOB 5: semgrep
@@ -257,7 +276,7 @@ jobs:
       # Scarica i report Surefire generati da security-tests nell'artifact.
       # SonarCloud li legge per calcolare la coverage senza rieseguire i test.
       - name: Download test results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: security-test-results
           path: target/surefire-reports/
@@ -278,5 +297,4 @@ jobs:
           -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
           -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
           -Dsonar.host.url=https://sonarcloud.io
-          "-Dsonar.branch.longLivedBranches.regex=(master|master-dev|develop|main)"
           --no-transfer-progress
