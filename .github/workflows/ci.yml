@@ -14,10 +14,11 @@ permissions:
 
 jobs:
   # JOB 1: gitguardian
-  # Scansiona l'intera storia del progetto cercando segreti hardcoded.
-  # Usa ggshield CLI direttamente (più stabile dell'action deprecata).
-  # "secret scan path --recursive" genera SARIF per il tab Security.
-  # "secret scan repo ." scansiona tutta la storia: blocca se trova segreti.
+  # Scansiona il working tree corrente (HEAD checkout) cercando segreti hardcoded.
+  # Usa "secret scan path --recursive" invece di "secret scan repo ." per evitare
+  # la scansione dell'intera storia git (fork 2023-2024 + team 2026 → timeout).
+  # I segreti storici sono gestiti dal dashboard GG + .gitguardian.yaml.
+  # Il gate blocca solo se trova segreti nel codice attualmente committato.
   gitguardian:
     name: GitGuardian Secret Scan
     runs-on: ubuntu-latest
@@ -27,28 +28,28 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
+        # fetch-depth default (1) sufficiente — non serve storia completa per path scan
 
       - name: Install ggshield
         run: pip install ggshield
 
-      - name: Scan secrets — genera SARIF
-        run: ggshield secret scan path . --recursive --format sarif --output gitguardian.sarif || true
+      - name: Scan secrets — working tree corrente
+        continue-on-error: true
+        id: ggshield_sarif
+        run: ggshield secret scan path --recursive . --format sarif --output gitguardian.sarif
         env:
           GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
 
       - name: Upload SARIF al tab Security di GitHub
-        if: hashFiles('gitguardian.sarif') != ''
+        if: always() && hashFiles('gitguardian.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: gitguardian.sarif
           category: gitguardian
 
-      - name: Scan secrets — blocca se trova segreti (full history)
-        run: ggshield secret scan repo .
-        env:
-          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
+      - name: Gate — blocca se trova segreti nel codice attuale
+        if: steps.ggshield_sarif.outcome == 'failure'
+        run: exit 1
 
 
   # JOB 2: compile
