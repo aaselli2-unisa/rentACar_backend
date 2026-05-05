@@ -12,6 +12,9 @@ import src.repository.image.CarImageRepository;
 import src.service.external.CloudinaryServiceImpl;
 import src.service.image.ImageRules;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
@@ -25,6 +28,8 @@ import static src.core.exception.type.NotFoundExceptionType.IMAGE_NOT_FOUND;
 @Service
 @RequiredArgsConstructor
 public class CarImageServiceImpl implements CarImageService {
+
+    private static final Logger log = LoggerFactory.getLogger(CarImageServiceImpl.class);
 
     // Security patch V07: only JPEG, PNG and WebP content-types are accepted.
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
@@ -68,7 +73,7 @@ public class CarImageServiceImpl implements CarImageService {
                     .build()
             );
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Car image upload failed for '{}'", licensePlate, e);
             throw new FileException(PHOTO_UPLOAD_FAILED);
         }
     }
