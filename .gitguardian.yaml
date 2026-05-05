@@ -1,0 +1,46 @@
+version: 2
+
+secret:
+  # -------------------------------------------------------------------------
+  # IGNORED PATHS
+  # ggshield salta questi file in tutti i commit della storia git.
+  # -------------------------------------------------------------------------
+  ignored-paths:
+    # application.properties è gitignored dalla root ma era committato
+    # nei commit del fork (Gökhan, 2023-2024). Conteneva credenziali AWS RDS,
+    # Cloudinary e JWT. Non viene più committato ma ignorato nella storia.
+    - "src/main/resources/application.properties"
+
+    # Vecchio CloudinaryConfig.java del fork con credenziali hardcodate.
+    # Il path originale era source_files/... (pre-refactor del team).
+    # La versione attuale in src/core/config/CloudinaryConfig.java usa @Value.
+    - "src/main/java/source_files/core/config/CloudinaryConfig.java"
+
+    # Tutti i file di test: le credenziali sono valori fittizi usati come
+    # mock input in JUnit (@WebMvcTest con H2 in-memory). Nessuna di queste
+    # stringhe dà accesso a sistemi reali.
+    - "src/test/**"
+
+  # -------------------------------------------------------------------------
+  # IGNORED MATCHES
+  # Sopprime specifici pattern in qualunque path (safety net aggiuntivo).
+  # -------------------------------------------------------------------------
+  ignored-matches:
+    # JWT placeholder in RefreshTokenRevocationSecurityTest.
+    # NON è un JWT valido: il payload è la stringa letterale "REFRESH",
+    # non un Base64 di JSON — quindi non può autenticarsi su nessun sistema.
+    - match: "eyJhbGciOiJIUzI1NiJ9.REFRESH.SIG"
+      name: "Fake JWT placeholder — RefreshTokenRevocationSecurityTest"
+
+    - match: "eyJhbGciOiJIUzI1NiJ9.NEW_REFRESH.SIG2"
+      name: "Fake JWT placeholder — RefreshTokenRevocationSecurityTest"
+
+    # Basic auth header in JwtAuthFilterTest.
+    # Base64 di "user:password" — credenziale di esempio universale,
+    # usata per verificare che l'app rifiuti l'autenticazione Basic.
+    - match: "dXNlcjpwYXNzd29yZA=="
+      name: "Base64 user:password — JwtAuthFilterTest placeholder"
+
+    # Basic auth più corta in SecurityFilterChainTest (stessa logica).
+    - match: "dXNlcjpwYXNz"
+      name: "Base64 user:pass — SecurityFilterChainTest placeholder"
