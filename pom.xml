@@ -18,7 +18,7 @@
         <!-- Security overrides: pin versions beyond what Spring Boot 3.5.13 ships -->
         <tomcat.version>10.1.54</tomcat.version>
         <spring-security.version>6.5.10</spring-security.version>
-        <postgresql.version>42.7.10</postgresql.version>
+        <postgresql.version>42.7.11</postgresql.version>
         <logback.version>1.5.25</logback.version>
         <commons-lang3.version>3.18.0</commons-lang3.version>
     </properties>
@@ -54,11 +54,7 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>2.0.4</version>
         </dependency>
-        <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-ui</artifactId>
-            <version>1.7.0</version>
-        </dependency>
+        <!-- springdoc-openapi-ui 1.7.0 removed: 1.x API conflicts with 2.x below. -->
         <!-- openapi -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -122,18 +118,9 @@
             <artifactId>lombok</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>io.springfox</groupId>
-            <artifactId>springfox-swagger2</artifactId>
-            <version>3.0.0</version>
-        </dependency>
-
-
-        <dependency>
-            <groupId>io.springfox</groupId>
-            <artifactId>springfox-boot-starter</artifactId>
-            <version>3.0.0</version>
-        </dependency>
+        <!-- springfox-swagger2 3.0.0 and springfox-boot-starter 3.0.0 removed:
+             unmaintained since 2021, XSS (Snyk #69) and input validation (Snyk #68).
+             Replaced by springdoc-openapi-starter-webmvc-ui below. -->
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -227,6 +214,14 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+
+            <!-- Strumento di analisi statica: eseguito dal CI con "mvn sonar:sonar".
+                 Non ha goal legati al lifecycle quindi non gira nelle build locali. -->
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>4.0.0.4121</version>
             </plugin>
         </plugins>
     </build>
