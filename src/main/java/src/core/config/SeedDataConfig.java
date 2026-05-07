@@ -439,11 +439,11 @@ public class SeedDataConfig implements CommandLineRunner {
                     PosixFilePermissions.fromString("rw-------"));
             tmpFile = Files.createTempFile(prefix + "_", ".jpg", attr);
         } catch (UnsupportedOperationException e) {
-            tmpFile = Files.createTempFile(prefix + "_", ".jpg");
-            File f = tmpFile.toFile();
+            File f = Files.createTempFile(prefix + "_", ".jpg").toFile();
             f.setReadable(true, true);
             f.setWritable(true, true);
             f.setExecutable(false, false);
+            tmpFile = f.toPath();
         }
         try (InputStream in = url.openStream()) {
             Files.copy(in, tmpFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
