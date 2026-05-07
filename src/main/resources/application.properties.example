@@ -36,7 +36,7 @@ spring.mail.properties.mail.smtp.ssl.checkserveridentity=true
 # server.tomcat.keep-alive-timeout=20s            # #71 Incomplete Cleanup DoS
 # spring.servlet.multipart.location=/tmp/app-uploads  # #75/#76 Temp File / Symlink
 # spring.servlet.multipart.max-file-size=5MB     # #75 size cap
-# spring.servlet.multipart.max-request-size=10MB # #75 size cap
+# spring.servlet.multipart.max-request-size=8MB  # #75 size cap (Sonar S5693 ≤8MB)
 # server.http2.enabled=true                       # #77 HTTP Request Smuggling
 # spring.jpa.properties.hibernate.jdbc.fetch_size=100  # #70 pgjdbc resource cap
 
