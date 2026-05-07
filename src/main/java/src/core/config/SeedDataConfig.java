@@ -66,14 +66,21 @@ import src.service.vehicle.features.common.shift.model.DefaultShiftType;
 import src.service.vehicle.features.common.status.VehicleStatusService;
 import src.service.vehicle.features.common.status.model.DefaultVehicleStatus;
 
+import org.apache.commons.lang3.SystemUtils;
+
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -428,7 +435,18 @@ public class SeedDataConfig implements CommandLineRunner {
     }
 
     private Path downloadToTempJpg(URL url, String prefix) throws IOException {
-        Path tmpFile = Files.createTempFile(prefix + "_", ".jpg");
+        Path tmpFile;
+        if (SystemUtils.IS_OS_UNIX) {
+            FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions.asFileAttribute(
+                    PosixFilePermissions.fromString("rw-------"));
+            tmpFile = Files.createTempFile(prefix + "_", ".jpg", attr);
+        } else {
+            tmpFile = Files.createTempFile(prefix + "_", ".jpg");
+            File f = tmpFile.toFile();
+            f.setReadable(true, true);
+            f.setWritable(true, true);
+            f.setExecutable(false, false);
+        }
         try (InputStream in = url.openStream()) {
             Files.copy(in, tmpFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
