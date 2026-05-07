@@ -66,7 +66,6 @@ import src.service.vehicle.features.common.shift.model.DefaultShiftType;
 import src.service.vehicle.features.common.status.VehicleStatusService;
 import src.service.vehicle.features.common.status.model.DefaultVehicleStatus;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -433,18 +432,9 @@ public class SeedDataConfig implements CommandLineRunner {
     }
 
     private Path downloadToTempJpg(URL url, String prefix) throws IOException {
-        Path tmpFile;
-        try {
-            FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions.asFileAttribute(
-                    PosixFilePermissions.fromString("rw-------"));
-            tmpFile = Files.createTempFile(prefix + "_", ".jpg", attr);
-        } catch (UnsupportedOperationException e) {
-            File f = Files.createTempFile(prefix + "_", ".jpg").toFile();
-            f.setReadable(true, true);
-            f.setWritable(true, true);
-            f.setExecutable(false, false);
-            tmpFile = f.toPath();
-        }
+        FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions.asFileAttribute(
+                PosixFilePermissions.fromString("rw-------"));
+        Path tmpFile = Files.createTempFile(prefix + "_", ".jpg", attr);
         try (InputStream in = url.openStream()) {
             Files.copy(in, tmpFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
