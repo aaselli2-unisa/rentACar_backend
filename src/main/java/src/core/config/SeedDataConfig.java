@@ -66,8 +66,6 @@ import src.service.vehicle.features.common.shift.model.DefaultShiftType;
 import src.service.vehicle.features.common.status.VehicleStatusService;
 import src.service.vehicle.features.common.status.model.DefaultVehicleStatus;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -436,11 +434,11 @@ public class SeedDataConfig implements CommandLineRunner {
 
     private Path downloadToTempJpg(URL url, String prefix) throws IOException {
         Path tmpFile;
-        if (SystemUtils.IS_OS_UNIX) {
+        try {
             FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions.asFileAttribute(
                     PosixFilePermissions.fromString("rw-------"));
             tmpFile = Files.createTempFile(prefix + "_", ".jpg", attr);
-        } else {
+        } catch (UnsupportedOperationException e) {
             tmpFile = Files.createTempFile(prefix + "_", ".jpg");
             File f = tmpFile.toFile();
             f.setReadable(true, true);
