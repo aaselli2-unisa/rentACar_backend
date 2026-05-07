@@ -16,8 +16,8 @@ jobs:
   # JOB 1: gitguardian
   # Scansiona il working tree corrente (HEAD checkout) cercando segreti hardcoded.
   # Usa "secret scan path --recursive" invece di "secret scan repo ." per evitare
-  # la scansione dell'intera storia git (fork 2023-2024 + team 2026 → timeout).
-  # I segreti storici sono gestiti dal dashboard GG + .gitguardian.yaml.
+  # la scansione dell'intera storia git (fork 2023).
+  # I segreti della intera history sono gestiti dal dashboard GG.
   # Il gate blocca solo se trova segreti nel codice attualmente committato.
   gitguardian:
     name: GitGuardian Secret Scan
@@ -245,4 +245,5 @@ jobs:
           -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
           -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
           -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.qualitygate.wait=true
           --no-transfer-progress
