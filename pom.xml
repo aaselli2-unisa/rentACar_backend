@@ -91,12 +91,8 @@
             <scope>test</scope>
         </dependency>
         <!-- spring-security-config -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-devtools</artifactId>
-            <scope>runtime</scope>
-            <optional>true</optional>
-        </dependency>
+        <!-- spring-boot-devtools removed: Snyk #73 Timing Attack (CWE-208).
+             DevTools must never be in production artifacts. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jdbc</artifactId>
