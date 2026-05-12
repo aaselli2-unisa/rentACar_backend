@@ -50,16 +50,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Genera i tag dell'immagine dalla release GitHub.
-      # Esempio: Release "v1.2.3" → tag immagine: 1.2.3 + latest
-      - name: Docker metadata (tag versione)
+      # Calcola i tag: IMAGE:VERSION + IMAGE:latest
+      # Esempio: Release "v1.2.3" → username/rentacar-backend:1.2.3,username/rentacar-backend:latest
+      # workflow_dispatch senza release → solo :latest
+      - name: Prepara tag immagine
         id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/rentacar-backend
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest
+        run: |
+          IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/rentacar-backend"
+          TAG="${{ github.event.release.tag_name }}"
+          if [ -n "$TAG" ]; then
+            VERSION="${TAG#v}"
+            echo "tags=${IMAGE}:${VERSION},${IMAGE}:latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=${IMAGE}:latest" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build immagine Docker (locale, no push)
         uses: docker/build-push-action@v7
@@ -68,14 +72,13 @@ jobs:
           push: false
           load: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Salva immagine come artifact
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
-        run: docker save $(echo "$TAGS" | tr '\n' ' ' | xargs) -o /tmp/image.tar
+        run: docker save $(echo "$TAGS" | tr ',' ' ') -o /tmp/image.tar
 
       - uses: actions/upload-artifact@v4
         with:
