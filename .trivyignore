@@ -1,0 +1,9 @@
+# CVE nel binario pebble (process manager Go) incluso nell'immagine base eclipse-temurin:17-jre.
+# Non è codice nostro: le fix esistono in Go stdlib 1.26.3 ma eclipse-temurin non ha
+# ancora aggiornato il binario pebble bundled. Eventualmente rimuovere queste eccezioni quando
+# eclipse-temurin:17-jre includerà pebble compilato con Go >= 1.26.3.
+CVE-2026-33811
+CVE-2026-33814
+CVE-2026-39820
+CVE-2026-39836
+CVE-2026-42499
