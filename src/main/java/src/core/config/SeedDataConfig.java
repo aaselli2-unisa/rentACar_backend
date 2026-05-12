@@ -71,9 +71,13 @@ import java.io.InputStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -428,7 +432,9 @@ public class SeedDataConfig implements CommandLineRunner {
     }
 
     private Path downloadToTempJpg(URL url, String prefix) throws IOException {
-        Path tmpFile = Files.createTempFile(prefix + "_", ".jpg");
+        FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions.asFileAttribute(
+                PosixFilePermissions.fromString("rw-------"));
+        Path tmpFile = Files.createTempFile(prefix + "_", ".jpg", attr);
         try (InputStream in = url.openStream()) {
             Files.copy(in, tmpFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }

@@ -11,6 +11,9 @@ import src.repository.image.BrandImageRepository;
 import src.service.external.CloudinaryServiceImpl;
 import src.service.image.ImageRules;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.List;
 
@@ -21,6 +24,8 @@ import static src.core.exception.type.NotFoundExceptionType.IMAGE_NOT_FOUND;
 @Service
 @RequiredArgsConstructor
 public class BrandImageServiceImpl implements BrandImageService {
+
+    private static final Logger log = LoggerFactory.getLogger(BrandImageServiceImpl.class);
     private final BrandImageRepository repository;
     private final ImageRules rules;
     private final CloudinaryServiceImpl cloudinaryServiceImpl;
@@ -37,7 +42,7 @@ public class BrandImageServiceImpl implements BrandImageService {
                     .build()
             );
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Brand image upload failed for '{}'", brandName, e);
             throw new FileException(PHOTO_UPLOAD_FAILED);
         }
     }

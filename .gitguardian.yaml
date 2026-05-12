@@ -1,0 +1,60 @@
+version: 2
+
+secret:
+  # -------------------------------------------------------------------------
+  # IGNORED PATHS — ggshield salta questi file in tutti i commit della storia.
+  # Nota: usare underscore (ignored_paths), non trattino (deprecated in v1.x).
+  # -------------------------------------------------------------------------
+  ignored_paths:
+    # application.properties era committato nei commit del fork (2023-2024).
+    # Conteneva AWS RDS, Cloudinary hardcodata, JWT key prod. Ora è gitignored.
+    - "src/main/resources/application.properties"
+
+    # Vecchio CloudinaryConfig.java del fork con credenziali hardcodate
+    # (path pre-refactor source_files/...). La versione attuale usa @Value.
+    - "src/main/java/source_files/core/config/CloudinaryConfig.java"
+
+    # Directory test Java — tutti i valori sono mock per JUnit, nessun accesso reale.
+    - "src/test/java"
+
+    # Directory test resources — contiene application-test.properties con H2/test config.
+    - "src/test/resources"
+
+  # -------------------------------------------------------------------------
+  # IGNORED MATCHES — match sui valori esatti dei secret rilevati.
+  # Doppio livello di protezione: se ignored_paths non copre un path edge case,
+  # questi match sopprimono comunque i finding specifici.
+  # Nota: usare underscore (ignored_matches), non trattino (deprecated in v1.x).
+  # -------------------------------------------------------------------------
+  ignored_matches:
+    # ---- Test: JWT placeholder tokens (RefreshTokenRevocationSecurityTest) ----
+    # NON sono JWT validi: payload = stringa letterale "REFRESH", non Base64 JSON.
+    - match: "eyJhbGciOiJIUzI1NiJ9.REFRESH.SIG"
+      name: "Fake JWT placeholder — RefreshTokenRevocationSecurityTest"
+
+    - match: "eyJhbGciOiJIUzI1NiJ9.NEW_REFRESH.SIG2"
+      name: "Fake JWT placeholder — RefreshTokenRevocationSecurityTest"
+
+    # ---- Test: Basic auth header (JwtAuthFilterTest, SecurityFilterChainTest) ----
+    # Base64 di "user:password" e "user:pass" — placeholder universale da documentazione.
+    - match: "dXNlcjpwYXNzd29yZA=="
+      name: "Base64 user:password — JwtAuthFilterTest placeholder"
+
+    - match: "dXNlcjpwYXNz"
+      name: "Base64 user:pass — SecurityFilterChainTest placeholder"
+
+    # ---- Test: password in JSON body (AuthenticationControllerSecurityTest, RoleEscalationSecurityTest) ----
+    # Incidents 32362683 e 32362682 — utente "alice@example.com" esiste solo in H2 in-memory.
+    - match: "Str0ng@Pass"
+      name: "Test password — AuthenticationControllerSecurityTest / RoleEscalationSecurityTest"
+
+    # ---- Test: password in query param (UserControllerSecurityTest commit b4fe2c8f) ----
+    # Incident 32362686 — param("password", ...) in test che verifica rifiuto method style.
+    - match: "SuperSecret!"
+      name: "Test password — UserControllerSecurityTest updatePassword query-param test"
+
+    # ---- Test: JWT signing key in application-test.properties ----
+    # Incident 32362675 — usato solo con spring.profiles.active=test,
+    # con database H2 in-memory. Nessun token generato in test è valido in prod.
+    - match: "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
+      name: "JWT key in application-test.properties (test profile only)"

@@ -11,6 +11,9 @@ import src.repository.image.UserImageRepository;
 import src.service.external.CloudinaryServiceImpl;
 import src.service.image.ImageRules;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +27,8 @@ import static src.core.exception.type.NotFoundExceptionType.IMAGE_NOT_FOUND;
 @Service
 @RequiredArgsConstructor
 public class UserImageServiceImpl implements UserImageService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserImageServiceImpl.class);
 
     // Security patch V07: same content-type whitelist as CarImageServiceImpl.
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
@@ -55,7 +60,7 @@ public class UserImageServiceImpl implements UserImageService {
                     .build());
             return savedImage.getId();
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("User image upload failed for '{}'", emailAddress, e);
             throw new FileException(PHOTO_UPLOAD_FAILED);
         }
     }

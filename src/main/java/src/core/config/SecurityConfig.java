@@ -10,6 +10,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -27,6 +28,7 @@ import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @AllArgsConstructor
+@EnableMethodSecurity
 public class SecurityConfig {
 
     // Security patch V13: Swagger and API-docs paths removed from the public whitelist.
@@ -82,20 +84,29 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/customers/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/images/**").hasRole("ADMIN")
 
-                        // Domain endpoints kept authenticated by default
-                        .requestMatchers("/api/v1/brands/**").authenticated()
-                        .requestMatchers("/api/v1/colors/**").authenticated()
-                        .requestMatchers("/api/v1/carBodyTypes/**").authenticated()
-                        .requestMatchers("/api/v1/carModels/**").authenticated()
-                        .requestMatchers("/api/v1/cars/**").authenticated()
-                        .requestMatchers("/api/v1/fuels/**").authenticated()
-                        .requestMatchers("/api/v1/gearshifts/**").authenticated()
-                        .requestMatchers("/api/v1/vehicle-statuses/**").authenticated()
-                        // GET drivingLicenseType is needed by the public signup form (dropdown)
+                        // Security patch V16: catalogue/lookup domains split by method.
+                        // GET stays authenticated() (any logged-in user can browse).
+                        // POST/PUT/DELETE restricted to ADMIN — a CUSTOMER must not be able
+                        // to create, modify, or delete cars, brands, colors or any catalogue
+                        // entity (CWE-284 / OWASP A01 Broken Access Control).
+                        // Spring Security evaluates rules top-to-bottom: a GET request matches
+                        // the first rule (authenticated) and stops; POST/PUT/DELETE fall through
+                        // to the second rule (hasRole ADMIN).
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/cars/**", "/api/v1/brands/**", "/api/v1/colors/**",
+                                "/api/v1/fuels/**", "/api/v1/gearshifts/**",
+                                "/api/v1/vehicle-statuses/**", "/api/v1/carBodyTypes/**",
+                                "/api/v1/carModels/**", "/api/v1/car-segments/**").authenticated()
+                        .requestMatchers(
+                                "/api/v1/cars/**", "/api/v1/brands/**", "/api/v1/colors/**",
+                                "/api/v1/fuels/**", "/api/v1/gearshifts/**",
+                                "/api/v1/vehicle-statuses/**", "/api/v1/carBodyTypes/**",
+                                "/api/v1/carModels/**", "/api/v1/car-segments/**").hasRole("ADMIN")
+                        // GET drivingLicenseType is needed by the public signup form (dropdown).
+                        // Write ops restricted to ADMIN (V16).
                         .requestMatchers(HttpMethod.GET, "/api/v1/drivingLicenseType/**").permitAll()
-                        .requestMatchers("/api/v1/drivingLicenseType/**").authenticated()
+                        .requestMatchers("/api/v1/drivingLicenseType/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/rentalStatuses/**").authenticated()
-                        .requestMatchers("/api/v1/car-segments/**").authenticated()
 
                         .anyRequest().authenticated()
                 )

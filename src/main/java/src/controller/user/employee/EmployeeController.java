@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import src.controller.TResponse;
 import src.controller.user.employee.request.CreateEmployeeRequest;
@@ -20,6 +21,7 @@ import static src.controller.user.employee.LogConstant.*;
 @Slf4j
 @RequestMapping("api/v1/employees")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class EmployeeController {
     private final EmployeeService employeeService;
 

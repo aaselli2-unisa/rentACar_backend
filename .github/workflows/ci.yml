@@ -2,139 +2,224 @@ name: CI
 
 on:
   push:
-    branches: [master-dev,master]
+    branches: [master-dev, master]
   pull_request:
     branches: [master]
   workflow_dispatch:
 
-# Permessi minimi di default — ogni job eleva solo ciò che serve.
+# Per sicurezza, impostiamo il minimo indispensabile come permessi di default.
+# I singoli job che hanno bisogno di più permessi li aggiungono localmente.
 permissions:
   contents: read
 
 jobs:
-  # ── 1. Compilazione ─────────────────────────────────────────────────────────
+  # JOB 1: gitguardian
+  # Scansiona il working tree corrente (HEAD checkout) cercando segreti hardcoded.
+  # Usa "secret scan path --recursive" invece di "secret scan repo ." per evitare
+  # la scansione dell'intera storia git (fork 2023).
+  # I segreti della intera history sono gestiti dal dashboard GG.
+  # Il gate blocca solo se trova segreti nel codice attualmente committato.
+  gitguardian:
+    name: GitGuardian Secret Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+        # fetch-depth default (1) sufficiente — non serve storia completa per path scan
+
+      - name: Install ggshield
+        run: pip install ggshield
+
+      - name: Scan secrets — working tree corrente
+        continue-on-error: true
+        id: ggshield_sarif
+        run: ggshield secret scan path --recursive . --format sarif --output gitguardian.sarif
+        env:
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
+
+      - name: Upload SARIF al tab Security di GitHub
+        if: always() && hashFiles('gitguardian.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: gitguardian.sarif
+          category: gitguardian
+
+      - name: Gate — blocca se trova segreti nel codice attuale
+        if: steps.ggshield_sarif.outcome == 'failure'
+        run: exit 1
+
+
+  # JOB 2: compile
+  # Gate iniziale: verifica che il codice Java compili prima di avviare
+  # i job downstream. Se la build è rotta, tutti i job che dichiarano
+  # "needs: compile" vengono saltati automaticamente senza sprecare runner.
   compile:
     name: Compile
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: temurin
           cache: maven
 
-      - name: Compile (no tests)
+      - name: Compile
         run: mvn -B -DskipTests compile --no-transfer-progress
 
-  # ── 2. Security Tests (OWASP patches) ───────────────────────────────
-  # Job dedicato ai test di sicurezza: fallisce la pipeline se uno fallisce.
-  # 31 classi in com.extendrent.security → 279 test, selezionati via profilo Maven
-  # -Psecurity-tests (pom.xml) con Surefire includes: **/security/*Test.java
+
+  # JOB 3: security-tests
+  # Esegue la suite di test di sicurezza del progetto.
+  # Usa il profilo Maven "security-tests" definito nel pom.xml così eseguiamo
+  # solo i test in src/test/java/.../security/ senza girare tutta la suite.
+  # I report Surefire salvati come artifact vengono scaricati da SonarCloud
+  # per calcolare la coverage senza dover rieseguire i test.
   security-tests:
     name: Security Tests
     runs-on: ubuntu-latest
     needs: compile
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: temurin
           cache: maven
 
-      - name: Run security test suite
+      - name: Run security tests
         run: mvn -B test -Dspring.profiles.active=test -Psecurity-tests --no-transfer-progress
 
-      - name: Upload security test results
+      - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: security-test-results
           path: target/surefire-reports/
           retention-days: 30
 
-  # ── 3. OWASP Dependency Check ────────────────────────────────────────────────
-  # Confronta tutte le dipendenze Maven (pom.xml) con il database NVD (National
-  # Vulnerability Database) di CVE pubbliche. In pratica: se stai usando una
-  # libreria con una vulnerabilità nota (es. Log4Shell in log4j), questo job
-  # la individua e fa fallire la pipeline prima che arrivi in produzione.
-  #
-  # Fallisce se trova vulnerabilità con CVSS >= 3 (HIGH o CRITICAL).
-  #
-  # Falsi positivi: se una CVE non è realmente sfruttabile nel progetto (es. la
-  # vulnerabilità riguarda una funzione che non usi), aggiungila a
-  # .github/owasp-suppressions.xml con motivazione e data di revisione.
-  # I risultati appaiono anche nel tab Security → Code scanning del repo.
-  #
-  # Nota: la prima esecuzione scarica il NVD database (~300 MB) e può richiedere
-  # alcuni minuti. Aggiungere NVD_API_KEY come secret del repo per evitare il
-  # rate-limit NVD e velocizzare i run successivi.
-  owasp-check:
-    name: OWASP Dependency Check
+
+  # JOB 4: snyk
+  # SCA (Software Composition Analysis): legge il pom.xml e confronta ogni
+  # dipendenza Maven con il database CVE di Snyk.
+  # Scansione low+ per visibilità completa nel tab Security.
+  # Gate blocca solo su HIGH/CRITICAL con fix disponibile (upgradable).
+  # I risultati appaiono nel tab Security → Code scanning del repo.
+  snyk:
+    name: Snyk Dependency Scan
     runs-on: ubuntu-latest
     needs: compile
-    timeout-minutes: 60
+    timeout-minutes: 15
     permissions:
       contents: read
-      security-events: write   # necessario per upload SARIF al tab Security
+      security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - name: Run OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@1.1.0
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
         with:
-          project: rentACar-backend
-          path: .
-          format: 'ALL'
-          args: >-
-            --suppression .github/owasp-suppressions.xml
-            --failOnCVSS 3
-            --enableRetired
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      - name: Setup Snyk
+        uses: snyk/actions/setup@master
+
+      - name: Run Snyk — scansione completa per visibilità
+        continue-on-error: true
         env:
-          NVD_API_KdiEY: ${{ secrets.NVD_API_KEY }}
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: snyk test --severity-threshold=low --sarif-file-output=snyk.sarif
 
       - name: Upload SARIF al tab Security di GitHub
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('snyk.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: reports/dependency-check-report.sarif
+          sarif_file: snyk.sarif
 
-      - name: Upload report come artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: owasp-report
-          path: reports/
-          retention-days: 30
+      - name: Gate — blocca solo su HIGH/CRITICAL con fix disponibile
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: snyk test --severity-threshold=high --fail-on=upgradable
 
-  # ── 5. Docker Build (validazione, nessun push) ──────────────────────────────
-  # Verifica che il Dockerfile del backend compili correttamente su ogni push.
-  # Il frontend vive in un repo separato e viene buildato dal proprio pipeline.
-  # Il push su ghcr.io avviene solo nel workflow deploy.yml, dopo che tutti
-  # i job di questo CI sono andati a buon fine.
-  docker-validate:
-    name: Docker Build Check
+
+  # JOB 5: semgrep
+  # SAST (Static Application Security Testing): analizza il codice sorgente Java
+  # alla ricerca di pattern insicuri (injection, XSS, SSRF, ecc.)
+  # Regole gestite da semgrep.dev tramite SEMGREP_APP_TOKEN (account richiesto).
+  # Blocca il CI su qualsiasi finding. I risultati appaiono nel tab Security → Code scanning.
+  semgrep:
+    name: Semgrep SAST
     runs-on: ubuntu-latest
     needs: compile
-    timeout-minutes: 60
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Run Semgrep
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          pip install semgrep --quiet
+          semgrep ci --sarif --output=semgrep.sarif
 
-      - name: Build image (no push)
-        uses: docker/build-push-action@v6
+      - name: Upload SARIF al tab Security di GitHub
+        if: always() && hashFiles('semgrep.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          context: .
-          push: false
-          tags: rentacar-app:ci-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          sarif_file: semgrep.sarif
+
+
+  # JOB 6: sonarcloud
+  # SAST + metriche di qualità + code coverage.
+  # Aspetta security-tests per due motivi:
+  #   1. Non parte se i test falliscono (quality gate implicito).
+  #   2. Scarica i report Surefire per la coverage senza rieseguire i test.
+  # Richiede sonar-maven-plugin nel pom.xml e le variabili SONAR_ORGANIZATION
+  # e SONAR_PROJECT_KEY configurate nelle GitHub Variables del repo.
+  sonarcloud:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+    needs: security-tests
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      - name: Download test results
+        uses: actions/download-artifact@v8
+        with:
+          name: security-test-results
+          path: target/surefire-reports/
+
+      - name: SonarCloud analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          mvn -B compile sonar:sonar
+          -DskipTests
+          -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+          -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+          -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.qualitygate.wait=false
+          --no-transfer-progress

@@ -51,6 +51,9 @@ services:
       - CLOUDINARY_API_SECRET
       - MAIL_USERNAME
       - MAIL_PASSWORD
+    # Snyk #75/#76: Insecure Temp File / Symlink Attack — /tmp in-memory, non eseguibile
+    tmpfs:
+      - /tmp:size=100m,noexec,nosuid
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
       interval: 30s

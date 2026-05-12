@@ -1,6 +1,8 @@
 package src.core.utilities;
 
 import lombok.experimental.UtilityClass;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -14,6 +16,8 @@ import java.util.zip.Inflater;
 
 @UtilityClass
 public class ImageUtils {
+
+    private static final Logger log = LoggerFactory.getLogger(ImageUtils.class);
 
     /**
      * Compresses the given byte array.
@@ -64,8 +68,8 @@ public class ImageUtils {
 
             return outputStream.toByteArray();
         } catch (IOException | DataFormatException e) {
-            e.printStackTrace(); // Logging on error
-            return null;
+            log.error("Image decompression failed", e);
+            throw new RuntimeException("Image decompression failed", e);
         } finally {
             inflater.end();
         }
