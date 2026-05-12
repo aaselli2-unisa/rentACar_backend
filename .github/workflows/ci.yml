@@ -182,31 +182,7 @@ jobs:
           sarif_file: semgrep.sarif
 
 
-  # JOB 6: docker-validate
-  # Verifica che il Dockerfile compili correttamente senza pubblicare l'immagine.
-  # Blocca il merge di modifiche che rompono la build Docker prima che arrivino
-  # nel CD, dove l'immagine verrebbe pushata su ghcr.io.
-  docker-validate:
-    name: Docker Build Check
-    runs-on: ubuntu-latest
-    needs: compile
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Docker build check (no push)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: false
-          tags: rentacar-app:ci-check
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-
-  # JOB 7: sonarcloud
+  # JOB 6: sonarcloud
   # SAST + metriche di qualità + code coverage.
   # Aspetta security-tests per due motivi:
   #   1. Non parte se i test falliscono (quality gate implicito).

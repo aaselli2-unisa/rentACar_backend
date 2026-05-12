@@ -8,11 +8,16 @@ name: Deploy
 #   1. Si sviluppa su master-dev -> CI viene avviata in automatico
 #   2. Si fa merge su master -> CI viene avviata di nuovo
 #   3. Quando si vuole deployare una versione: git tag v1.0.0 && git push origin v1.0.0
-#   4. Questo workflow parte, builda l'immagine Docker, la pubblica su GHCR e la scansiona
+#   4. Questo workflow parte, builda l'immagine Docker localmente, la scansiona con Trivy e Scout,
+#      e solo se i gate passano la pusha su Docker Hub
 
 # Perché i tag:
 #   - Tracciamento della versione che gira in produzione
 #   - Il rollback è banale: git tag v0.9.0 punta a un commit preciso
+
+# Secrets richiesti nel repository GitHub:
+#   - DOCKERHUB_USERNAME: username Docker Hub
+#   - DOCKERHUB_TOKEN:    access token Docker Hub (Settings → Security → Access Tokens)
 on:
   push:
     tags: ['v*.*.*']
@@ -23,45 +28,132 @@ permissions:
 
 jobs:
 
-  # Un unico job sequenziale: build Docker, push su GHCR, scansione Trivy.
+  # Job sequenziale: build locale → Trivy → Scout → push Docker Hub.
+  # Il push avviene solo se entrambi i gate di sicurezza passano.
   publish:
-    name: Build, Push & Scan
+    name: Build, Scan & Push
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
-      packages: write         # Push immagine su ghcr.io
-      security-events: write  # Upload risultati Trivy al tab Security di GitHub
+      security-events: write  # Upload risultati Trivy e Scout al tab Security di GitHub
+
+    env:
+      IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/rentacar-backend
 
     steps:
       - uses: actions/checkout@v6
 
       - uses: docker/setup-buildx-action@v4
 
-      - name: Login su GitHub Container Registry
+      - name: Login su Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }} #chi ha triggerato il workflow
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Genera automaticamente i tag dell'immagine dal tag Git che ha triggerato il workflow.
       # Esempio: se si fa "git tag v1.2.3 && git push origin v1.2.3", i tag dell'immagine saranno:
-      #   ghcr.io/aaselli2-unisa/rentacar_backend:1.2.3  <- versione completa
-      #   ghcr.io/aaselli2-unisa/rentacar_backend:latest <- sempre l'ultima versione (usato dai manifest K8s)
+      #   <user>/rentacar-backend:1.2.3  <- versione completa
+      #   <user>/rentacar-backend:latest <- sempre l'ultima versione (usato dai manifest K8s)
       # Con workflow_dispatch (manuale senza tag): genera solo :latest
       - name: Docker metadata (tag versione)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ env.IMAGE }}
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest
 
-      # Builda l'immagine e pusha su GHCR.
-      - name: Build e push immagine Docker
+      # Builda l'immagine e la carica nel daemon locale (no push).
+      # Il push avviene solo dopo aver superato entrambi i gate di sicurezza.
+      - name: Build immagine Docker (locale, no push)
         id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # === TRIVY ===
+      # Scanner open-source per vulnerabilità CVE (OS + dipendenze Java).
+      # Risultati visibili nel tab "Security -> Code scanning" del repo GitHub.
+
+      #   Step 1 (SARIF): scansiona tutto e genera il sarif
+      #   Step 2 (UPLOAD): uploada il sarif alla tab security di GH
+      #   Step 3 (gate): blocca se trova CRITICAL/HIGH con fix disponibile
+
+      #STEP1
+      - name: Trivy — genera SARIF (tutte le severità)
+        uses: aquasecurity/trivy-action@v0.30.0
+        with:
+          image-ref: '${{ env.IMAGE }}:latest'
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '0'
+
+      #STEP2
+      - name: Upload Trivy SARIF al tab Security di GitHub
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+      #STEP3
+      - name: Trivy — gate CRITICAL/HIGH con fix disponibile
+        uses: aquasecurity/trivy-action@v0.30.0
+        with:
+          image-ref: '${{ env.IMAGE }}:latest'
+          format: table
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      # === DOCKER SCOUT ===
+      # Scanner nativo di Docker Hub per vulnerabilità CVE.
+      # Analizza pacchetti OS e dipendenze Java nell'immagine finale.
+      # Risultati visibili nel tab "Security -> Code scanning" del repo GitHub
+      # e nella dashboard Docker Scout su hub.docker.com.
+
+      #   Step 1 (SARIF): scansiona tutto e genera il sarif
+      #   Step 2 (UPLOAD): uploada il sarif alla tab security di GH
+      #   Step 3 (gate): blocca se trova CRITICAL/HIGH con fix disponibile
+
+      #STEP1
+      - name: Docker Scout — genera SARIF (tutte le severità)
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: 'local://${{ env.IMAGE }}:latest'
+          sarif-file: scout-results.sarif
+          exit-code: false  # Non blocca: vogliamo il report completo anche se ci sono CVE
+
+      #STEP2
+      - name: Upload Scout SARIF al tab Security di GitHub
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: scout-results.sarif
+
+      #STEP3
+      - name: Docker Scout — gate CRITICAL/HIGH
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: 'local://${{ env.IMAGE }}:latest'
+          only-severities: critical,high
+          only-fixed: true   # Ignora CVE senza patch disponibile
+          exit-code: true    # Blocca il deploy se trova CVE gravi e risolvibili
+
+      # Push su Docker Hub solo se entrambi i gate (Trivy e Scout) passano.
+      # Usa la GHA cache del build step: nessuna ricompilazione, solo push dei layer.
+      - name: Push immagine su Docker Hub
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -69,50 +161,3 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Trivy è uno scanner open-source di vulnerabilità (CVE) per immagini Docker.
-      # Analizza i pacchetti del sistema operativo e
-      # le dipendenze Java dentro l'immagine finale
-      # (non il pom, ma proprio i pacchetti installati nell'immagine)
-
-      # Trivy analizza l'immagine: "il JRE base ha CVE? ci sono
-      # pacchetti OS vulnerabili? le jar dentro target/ hanno CVE?"
-      # Risultati visibili nel tab "Security -> Code scanning" del repo GitHub.
-
-
-      #   Step 1 (SARIF): scansiona tutto e genera il sarif
-      #   Step 2 (UPLOAD) Uploadiamo il sarif alla tab security di GH
-      #   Step 3 (gate): scansiona solo CRITICAL/HIGH con fix ma questa volta si blocca se trova qualcosa
-
-      #STEP1
-      - name: Trivy — genera SARIF (tutte le severità)
-        uses: aquasecurity/trivy-action@v0.35.0
-        with:
-          image-ref: ghcr.io/${{ github.repository }}:latest
-          format: sarif
-          output: trivy-results.sarif
-          exit-code: '0'  # Non blocca: vogliamo il report completo anche se ci sono CVE
-        env:
-          TRIVY_USERNAME: ${{ github.actor }}
-          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-
-      #STEP 2
-      - name: Upload SARIF al tab Security di GitHub
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: trivy-results.sarif
-
-      #STEP3
-      - name: Trivy — gate CRITICAL/HIGH
-        uses: aquasecurity/trivy-action@v0.35.0
-        with:
-          image-ref: ghcr.io/${{ github.repository }}:latest
-          format: table
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true  # Ignora CVE senza patch disponibile
-          exit-code: '1'        # Blocca il deploy se trova CVE gravi e risolvibili
-        env:
-          TRIVY_USERNAME: ${{ github.actor }}
-          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
