@@ -1,26 +1,22 @@
 name: Deploy
 
 # Quando gira:
-#   - push di un tag versione (es. v1.0.0)
+#   - pubblicazione di una release GitHub (UI: Releases → New Release → Publish)
 #   - workflow_dispatch: deploy manuale dalla UI GitHub (es. rollback)
 
 # Flusso di lavoro:
-#   1. Si sviluppa su master-dev -> CI viene avviata in automatico
-#   2. Si fa merge su master -> CI viene avviata di nuovo
-#   3. Quando si vuole deployare una versione: git tag v1.0.0 && git push origin v1.0.0
-#   4. Questo workflow parte, builda l'immagine Docker localmente, la scansiona con Trivy e Scout,
-#      e solo se i gate passano la pusha su Docker Hub
-
-# Perché i tag:
-#   - Tracciamento della versione che gira in produzione
-#   - Il rollback è banale: git tag v0.9.0 punta a un commit preciso
+#   1. Si sviluppa su master-dev → CI viene avviata in automatico
+#   2. Si fa merge su master → CI viene avviata di nuovo
+#   3. Quando si vuole deployare: creare una Release su GitHub (Releases → New Release)
+#   4. Questo workflow parte: Build → Scan → Push (tre job separati, sequenziali)
 
 # Secrets richiesti nel repository GitHub:
 #   - DOCKERHUB_USERNAME: username Docker Hub
 #   - DOCKERHUB_TOKEN:    access token Docker Hub (Settings → Security → Access Tokens)
+
 on:
-  push:
-    tags: ['v*.*.*']
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -28,15 +24,17 @@ permissions:
 
 jobs:
 
-  # Job sequenziale: build locale → Trivy → Scout → push Docker Hub.
-  # Il push avviene solo se entrambi i gate di sicurezza passano.
-  publish:
-    name: Build, Scan & Push
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 1: build
+  # Builda l'immagine Docker localmente (no push) e la salva come artifact.
+  # Il push avviene solo dopo che entrambi i gate di sicurezza (job scan) passano.
+  # ───────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build Docker Image
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     permissions:
       contents: read
-      security-events: write  # Upload risultati Trivy e Scout al tab Security di GitHub
 
     env:
       IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/rentacar-backend
@@ -52,11 +50,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Genera automaticamente i tag dell'immagine dal tag Git che ha triggerato il workflow.
-      # Esempio: se si fa "git tag v1.2.3 && git push origin v1.2.3", i tag dell'immagine saranno:
-      #   <user>/rentacar-backend:1.2.3  <- versione completa
-      #   <user>/rentacar-backend:latest <- sempre l'ultima versione (usato dai manifest K8s)
-      # Con workflow_dispatch (manuale senza tag): genera solo :latest
+      # Genera i tag dell'immagine dalla release GitHub.
+      # Esempio: Release "v1.2.3" → tag immagine: 1.2.3 + latest
       - name: Docker metadata (tag versione)
         id: meta
         uses: docker/metadata-action@v5
@@ -66,10 +61,7 @@ jobs:
             type=semver,pattern={{version}}
             type=raw,value=latest
 
-      # Builda l'immagine e la carica nel daemon locale (no push).
-      # Il push avviene solo dopo aver superato entrambi i gate di sicurezza.
       - name: Build immagine Docker (locale, no push)
-        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -80,24 +72,56 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Salva immagine come artifact
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: docker save $(echo "$TAGS" | tr '\n' ' ' | xargs) -o /tmp/image.tar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/image.tar
+          retention-days: 1
+
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 2: scan
+  # Carica l'immagine buildata e la scansiona con Trivy e Docker Scout.
+  # Blocca il workflow se trova CVE CRITICAL/HIGH con fix disponibile.
+  # Risultati visibili nel tab Security → Code scanning del repo.
+  # ───────────────────────────────────────────────────────────────────────────
+  scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+
+    env:
+      IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/rentacar-backend
+
+    steps:
+      - name: Download immagine
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load immagine Docker
+        run: docker load -i /tmp/image.tar
+
       # === TRIVY ===
       # Scanner open-source per vulnerabilità CVE (OS + dipendenze Java).
-      # Risultati visibili nel tab "Security -> Code scanning" del repo GitHub.
+      # Installato via script ufficiale per evitare dipendenze da versioni action.
 
-      #   Step 1 (SARIF): scansiona tutto e genera il sarif
-      #   Step 2 (UPLOAD): uploada il sarif alla tab security di GH
-      #   Step 3 (gate): blocca se trova CRITICAL/HIGH con fix disponibile
+      - name: Install Trivy
+        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
-      #STEP1
       - name: Trivy — genera SARIF (tutte le severità)
-        uses: aquasecurity/trivy-action@v0.30.0
-        with:
-          image-ref: '${{ env.IMAGE }}:latest'
-          format: sarif
-          output: trivy-results.sarif
-          exit-code: '0'
+        run: trivy image --format sarif --output trivy-results.sarif --exit-code 0 ${{ env.IMAGE }}:latest
 
-      #STEP2
       - name: Upload Trivy SARIF al tab Security di GitHub
         uses: github/codeql-action/upload-sarif@v4
         if: always()
@@ -105,59 +129,73 @@ jobs:
           sarif_file: trivy-results.sarif
           category: trivy
 
-      #STEP3
       - name: Trivy — gate CRITICAL/HIGH con fix disponibile
-        uses: aquasecurity/trivy-action@v0.30.0
-        with:
-          image-ref: '${{ env.IMAGE }}:latest'
-          format: table
-          exit-code: '1'
-          severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
+        run: trivy image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 ${{ env.IMAGE }}:latest
 
       # === DOCKER SCOUT ===
-      # Scanner nativo di Docker Hub per vulnerabilità CVE.
-      # Analizza pacchetti OS e dipendenze Java nell'immagine finale.
-      # Risultati visibili nel tab "Security -> Code scanning" del repo GitHub
-      # e nella dashboard Docker Scout su hub.docker.com.
+      # Scanner nativo Docker Hub per vulnerabilità CVE.
 
-      #   Step 1 (SARIF): scansiona tutto e genera il sarif
-      #   Step 2 (UPLOAD): uploada il sarif alla tab security di GH
-      #   Step 3 (gate): blocca se trova CRITICAL/HIGH con fix disponibile
+      - name: Login su Docker Hub (richiesto da Scout)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      #STEP1
       - name: Docker Scout — genera SARIF (tutte le severità)
         uses: docker/scout-action@v1
         with:
           command: cves
-          image: 'local://${{ env.IMAGE }}:latest'
+          image: local://${{ env.IMAGE }}:latest
           sarif-file: scout-results.sarif
-          exit-code: false  # Non blocca: vogliamo il report completo anche se ci sono CVE
+          exit-code: false
 
-      #STEP2
       - name: Upload Scout SARIF al tab Security di GitHub
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: scout-results.sarif
 
-      #STEP3
       - name: Docker Scout — gate CRITICAL/HIGH
         uses: docker/scout-action@v1
         with:
           command: cves
-          image: 'local://${{ env.IMAGE }}:latest'
+          image: local://${{ env.IMAGE }}:latest
           only-severities: critical,high
-          only-fixed: true   # Ignora CVE senza patch disponibile
-          exit-code: true    # Blocca il deploy se trova CVE gravi e risolvibili
+          only-fixed: true
+          exit-code: true
 
-      # Push su Docker Hub solo se entrambi i gate (Trivy e Scout) passano.
-      # Usa la GHA cache del build step: nessuna ricompilazione, solo push dei layer.
-      - name: Push immagine su Docker Hub
-        uses: docker/build-push-action@v7
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 3: push
+  # Push su Docker Hub solo se entrambi i gate (Trivy + Scout) passano.
+  # Carica l'immagine dall'artifact del job build e fa push di tutti i tag.
+  # ───────────────────────────────────────────────────────────────────────────
+  push:
+    name: Push su Docker Hub
+    runs-on: ubuntu-latest
+    needs: [build, scan]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    env:
+      IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/rentacar-backend
+
+    steps:
+      - name: Download immagine
+        uses: actions/download-artifact@v4
         with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
+          name: docker-image
+          path: /tmp
+
+      - name: Load immagine Docker
+        run: docker load -i /tmp/image.tar
+
+      - name: Login su Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push immagine su Docker Hub
+        run: docker push --all-tags ${{ env.IMAGE }}
