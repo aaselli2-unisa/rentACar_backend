@@ -16,7 +16,7 @@
     <properties>
         <java.version>17</java.version>
         <!-- Security overrides: pin versions beyond what Spring Boot 3.5.13 ships -->
-        <tomcat.version>10.1.54</tomcat.version>
+        <tomcat.version>10.1.55</tomcat.version>
         <spring-security.version>6.5.10</spring-security.version>
         <postgresql.version>42.7.11</postgresql.version>
         <logback.version>1.5.25</logback.version>
