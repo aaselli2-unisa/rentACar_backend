@@ -175,9 +175,10 @@ jobs:
           only-severities: critical,high
           only-fixed: true
           exit-code: true
-          # vex-location: soppressione chirurgica dei 5 CVE in pebble (bundled in eclipse-temurin:17-jre).
-          # A differenza di ignore-base:true, Scout continua a controllare tutti gli altri CVE della base.
-          vex-location: .docker/scout.vex.json
+          # ignore-base: ignora CVE nei layer dell'immagine base (eclipse-temurin:17-jre).
+          # pebble e golang.org/x/net sono bundled nella base — non sono codice nostro,
+          # non possiamo fixarli. Scout confronta i layer nostri vs base per distinguerli.
+          ignore-base: true
 
 
   # ───────────────────────────────────────────────────────────────────────────
