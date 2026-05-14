@@ -1,0 +1,112 @@
+
+# FRONTEND nginx — Deployment + Service
+
+# Questo file replica il servizio "frontend" del docker-compose.yml.
+# Contiene due risorse:
+#
+#   1. Deployment: esegue il container nginx con la React app buildata
+#   2. Service: espone la porta 80 all'Ingress (05-ingress.yaml)
+#
+# Architettura del frontend:
+#   Il container nginx serve due ruoli simultaneamente:
+#   a) File server: serve i file statici React (HTML, JS, CSS) su "/"
+
+#   b) Reverse proxy: forward delle chiamate "/api/*" a Spring Boot
+#      tramite "proxy_pass http://rentacar-app:8080/api/" (nginx.conf)
+#
+#   Questo significa che il browser non vede mai la porta 8080 di Spring Boot.
+#   Tutto passa attraverso il frontend nginx, che agisce come unico punto
+#   di ingresso per l'utente.
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rentacar-frontend   # Nome del Deployment
+  namespace: rentacar
+spec:
+  replicas: 1               # Una sola istanza nginx. Il frontend è stateless e
+                            # potrebbe scalare a più repliche, ma per dimostrazione è sufficiente 1.
+  selector:
+    matchLabels:
+      app: rentacar-frontend  # Identifica i pod gestiti da questo Deployment
+
+  template:
+    metadata:
+      labels:
+        app: rentacar-frontend  # Label usata dal selector sopra e dal Service sotto
+    spec:
+      securityContext:
+        runAsNonRoot: true      # nginx:alpine usa l'utente "nginx" (uid 101): non root
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: rentacar-frontend
+          # Immagine buildata e pushata dal workflow deploy.yml su Docker Hub.
+          # Contiene: React app buildata + nginx.conf che fa proxy a rentacar-app.
+          # Il nginx.conf è copiato dentro l'immagine durante docker build (Dockerfile frontend).
+          # Pushata dal workflow deploy.yml lato FE
+          image: ben03030303/rentacar-frontend:latest
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE"]  # nginx deve poter bindare porta 80 (<1024 richiede questa capability)
+            runAsUser: 101               # UID dell'utente "nginx" in nginx:alpine
+
+          imagePullPolicy: Always  # Scarica sempre l'ultima versione da Docker Hub.
+                                   # Necessario con tag :latest per ricevere aggiornamenti.
+
+          ports:
+            - containerPort: 80    # nginx ascolta su porta 80 (standard HTTP).
+                                   # Deve matchare EXPOSE 80 nel Dockerfile del frontend.
+
+          readinessProbe:
+            # Verifica che nginx stia servendo correttamente la pagina principale.
+            # K8s non manda traffico al pod finché questa probe non passa.
+            httpGet:
+              path: /              # Richiede la homepage React
+              port: 80
+            initialDelaySeconds: 10  # nginx si avvia molto velocemente (~2-3s),
+                                     # 10s è ampiamente sufficiente.
+            periodSeconds: 5
+
+          livenessProbe:
+            # Se nginx smette di rispondere (crash, deadlock), K8s riavvia il container.
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 15  # Aspetta 15s prima del primo check liveness
+            periodSeconds: 30        # Check ogni 30 secondi
+
+          resources:
+            requests:
+              # nginx è molto leggero: usa ~5-15MB RAM e pochissima CPU in idle.
+              memory: "64Mi"   # 64MB garantiti: abbondante per nginx statico
+              cpu: "50m"       # 50 millicores = 0.05 CPU: quasi nulla per nginx
+            limits:
+              memory: "128Mi"  # 128MB massimo: nginx non dovrebbe mai superarlo
+              cpu: "200m"      # 0.2 CPU massimo: sufficiente anche sotto carico
+
+
+---
+
+# Service — rentacar-frontend
+# Espone il pod frontend agli altri componenti K8s, in particolare all'Ingress.
+# L'Ingress (05-ingress.yaml) manda tutto il traffico esterno a questo Service.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: rentacar-frontend   # Nome referenziato in 05-ingress.yaml come backend.service.name
+  namespace: rentacar
+spec:
+  selector:
+    app: rentacar-frontend  # Manda traffico ai pod con label "app: rentacar-frontend"
+  ports:
+    - port: 80              # Porta esposta dal Service (quella che usa l'Ingress)
+      targetPort: 80        # Porta del container nginx
+  # type: ClusterIP (default) — solo l'Ingress comunica con questo Service.
+  # Non usiamo NodePort o LoadBalancer perché l'Ingress gestisce l'accesso esterno.

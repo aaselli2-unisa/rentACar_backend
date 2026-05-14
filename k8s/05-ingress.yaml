@@ -1,0 +1,84 @@
+# INGRESS — rentacar-ingress
+
+# Un Ingress è il punto di ingresso del traffico HTTP/HTTPS dall'esterno
+# del cluster verso i Service interni.
+#
+# Senza Ingress, i pod sono raggiungibili solo dall'interno del cluster.
+# L'Ingress usa nginx-ingress-controller (abilitato con "microk8s enable ingress")
+# per ricevere traffico sulla porta 80 del nodo Ubuntu e forwardarlo al
+# Service rentacar-frontend.
+#
+# Flusso del traffico esterno:
+#
+#   Browser utente
+#     → IP:80 del server Ubuntu
+#       → nginx-ingress-controller (pod in namespace ingress)
+#         → Service rentacar-frontend (ClusterIP)
+#           → Pod nginx frontend
+#             → File statici React (per "/")
+#             → proxy_pass a rentacar-app:8080 (per "/api/*")
+#               → Pod Spring Boot
+#                 → PostgreSQL
+#
+#   L'Ingress manda tutto a frontend nginx. Il frontend fa proxy /api/.
+#   Spring Boot non è mai esposto direttamente a internet. Questo è
+#
+# Configurazione senza dominio:
+#   Senza "host:" specificato, l'Ingress risponde a qualsiasi hostname
+#   e qualsiasi IP. Accessibile da http://IP-SERVER-UBUNTU/ senza DNS.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rentacar-ingress    # Nome dell'Ingress (informativo)
+  namespace: rentacar
+
+  annotations:
+    # Annotations: configurazione specifica per nginx-ingress-controller.
+    # Questi parametri vengono letti dal controller nginx e tradotti in
+    # direttive nginx.conf del pod ingress-controller.
+
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    # Timeout in secondi per leggere la risposta dal backend (frontend nginx,
+    # che a sua volta chiama Spring Boot). 120s è sufficiente per le API
+    # Spring Boot di questo progetto.
+
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    # Timeout in secondi per inviare la richiesta al backend.
+    # Simmetrico al proxy-read-timeout.
+
+spec:
+  ingressClassName: nginx
+  # Specifica quale ingress controller gestisce questa risorsa.
+  # microk8s con "microk8s enable ingress" installa nginx-ingress-controller
+  # che si registra come classe "nginx". Senza questo campo, K8s non sa
+  # quale controller deve processare l'Ingress.
+
+  rules:
+    # Lista di regole di routing. Ogni regola può filtrare per host e path.
+    - http:
+        # Nessun "host:" specificato → questa regola vale per qualsiasi hostname.
+        # Permette accesso tramite IP diretto (es. http://192.168.1.62/)
+        # oltre che tramite dominio (se configurato in futuro).
+        paths:
+          - path: /
+            # Tutto il traffico che arriva su "/" e sottopercorsi va al frontend.
+            # Il frontend nginx gestisce internamente la separazione:
+            #   - "/" → serve index.html (React SPA)
+            #   - "/api/" → proxy_pass a rentacar-app:8080
+            #   - "/*.js, /*.css" → file statici con cache
+
+            pathType: Prefix
+            # Prefix: "/" matcha "/" e tutti i sottopercorsi ("/api/cars", "/login", ecc.).
+            # Alternativa: Exact (solo "/" esatto) o ImplementationSpecific.
+            # Prefix è corretto per una SPA React con React Router.
+
+            backend:
+              service:
+                name: rentacar-frontend
+                # Nome del Service K8s a cui forwardare il traffico.
+                # Deve corrispondere a metadata.name in 04-frontend.yaml.
+                port:
+                  number: 80
+                  # Porta del Service rentacar-frontend (non del container direttamente).
+                  # Il Service poi forwarda alla containerPort 80 del pod nginx.
