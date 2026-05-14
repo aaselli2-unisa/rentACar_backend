@@ -1,0 +1,8 @@
+# Un Namespace in K8s è un "contenitore logico" che isola le risorse.
+# Tutti gli oggetti del progetto (Deployment, Service, Secret, ecc.) vivono
+# nel namespace "rentacar", separati da altri namespace sul cluster.
+
+apiVersion: v1        # API group di base K8s, tutti gli oggetti "core" usano v1
+kind: Namespace       # Tipo di risorsa: namespace
+metadata:
+  name: rentacar      # Nome del namespace; tutti gli altri manifest usano "namespace: rentacar"
