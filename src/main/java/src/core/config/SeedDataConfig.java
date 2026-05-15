@@ -365,9 +365,9 @@ public class SeedDataConfig implements CommandLineRunner {
                 CreditCardInformation creditCardInformation = CreditCardInformation.builder()
                         .cardOwnerName("customer")
                         .cardOwnerSurname("customer")
-                        .cardNumber("1111111111111111")
+                        .cardNumber("4111111111111111")
                         .cvc("111")
-                        .expirationDate(LocalDate.parse("2024-09-01"))
+                        .expirationDate(LocalDate.parse("2028-09-01"))
                         .build();
 
 
