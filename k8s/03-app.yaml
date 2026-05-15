@@ -32,6 +32,7 @@ spec:
         app: rentacar-app  # Label usata da selector sopra e dal Service sotto
     spec:
 
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true      # K8s rifiuta il pod se il container gira come root
         seccompProfile:

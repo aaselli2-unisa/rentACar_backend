@@ -121,4 +121,4 @@ spec:
               name: nginx-ingress-microk8s           # Label del pod ingress-controller in microk8s
       ports:
         - protocol: TCP
-          port: 80
+          port: 8080
