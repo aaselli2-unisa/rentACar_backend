@@ -54,11 +54,15 @@ public class Application implements CommandLineRunner {
     }
 
     @Override
-    public void run(String... args) throws IOException {
+    public void run(String... args) {
         serviceLogger.disable();
         System.out.println(ANSI_BOLD + ANSI_BLUE + "Application starting..." + ANSI_RESET);
         ResponseTimeMeasurement.start();
-        seedDataConfig.runFirst();
+        try {
+            seedDataConfig.runFirst();
+        } catch (Exception e) {
+            System.err.println("Seed data failed (non-fatal): " + e.getMessage());
+        }
         double duration = ResponseTimeMeasurement.end();
         processInfo(duration);
         welcome();
