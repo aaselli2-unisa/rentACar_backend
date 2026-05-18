@@ -106,13 +106,13 @@ Progetto Universitario - **Andrea Aselli** · **Benedetto Pio Turino** · **Eman
 
 Funzionalità principali:
 
-- **Autenticazione JWT** - Registrazione, login, refresh token, verifica account via OTP; token veicolati come cookie `HttpOnly; Secure; SameSite=Strict` (patch V-02)
-- **RBAC a tre ruoli** - Admin, Employee, Customer con policy deny-by-default
-- **Catalogo Veicoli** - Ricerca filtrata su 23 attributi (marca, colore, carburante, segmento, tipo patente)
-- **Ciclo di Vita del Noleggio** - Creazione, avvio, restituzione, cancellazione con tracciamento chilometri
-- **Pagamenti e Sconti** - Validazione Luhn, report ricavi, codici sconto con percentuale configurabile
-- **Upload Immagini** - Su Cloudinary con whitelist del tipo file (patch V07)
-- **API Documentation** - Swagger / OpenAPI, riservato al solo ADMIN (patch V13)
+- **Autenticazione JWT**: Registrazione, login, refresh token, verifica account via OTP; token veicolati come cookie `HttpOnly; Secure; SameSite=Strict` (patch V-02)
+- **RBAC a tre ruoli**: Admin, Employee, Customer con policy deny-by-default
+- **Catalogo Veicoli**: Ricerca filtrata su 23 attributi (marca, colore, carburante, segmento, tipo patente)
+- **Ciclo di Vita del Noleggio**: Creazione, avvio, restituzione, cancellazione con tracciamento chilometri
+- **Pagamenti e Sconti**: Report ricavi, codici sconto con percentuale configurabile
+- **Upload Immagini**: Su Cloudinary con whitelist del tipo file (patch V07)
+- **API Documentation**: Swagger / OpenAPI, riservato al solo ADMIN (patch V13)
 
 All'avvio, `SeedDataConfig` popola automaticamente le tabelle di lookup con i valori di default definiti nelle enum: marche, modelli, colori, tipi carburante, cambi, carrozzerie, segmenti, stati veicolo e stati noleggio, tipi di pagamento, tipi di patente di guida, utente admin di default. Il tutto viene eseguito tramite `CommandLineRunner` nella classe `Application`, con logging AOP temporaneamente disabilitato durante l'inizializzazione per evitare output ridondante.
 
@@ -137,10 +137,7 @@ All'avvio, `SeedDataConfig` popola automaticamente le tabelle di lookup con i va
 | **Swagger / OpenAPI** | 2.0.4 | Documentazione API (springdoc) |
 | **progressbar** | 0.10.0 | Progress bar ASCII durante seed dati all'avvio |
 
-**Dipendenze rimosse:**
 
-- `spring-boot-devtools` - Snyk #73: Timing Attack (CWE-208); DevTools non deve mai essere in produzione
-- `springfox-swagger2` / `springfox-swagger-ui` - Snyk #68/#69: XSS + Improper Input Validation; non mantenuti dal 2021; sostituiti da `springdoc-openapi-starter-webmvc-ui:2.0.4`
 
 **Dipendenze di test:**
 
@@ -165,7 +162,7 @@ All'avvio, `SeedDataConfig` popola automaticamente le tabelle di lookup con i va
 
 ### 1.3 System Design - Class Diagram
 
-Il modello delle entità è suddiviso in tre diagrammi tematici per ragioni di leggibilità. Tutti gli oggetti persistenti ereditano da `BaseEntity`, una *MappedSuperclass* che fornisce i campi comuni a tutte le entità: `id`, `isDeleted`, `deletedAt`, `lastModified` e `createdDate`, garantendo uniformità nella gestione del ciclo di vita e supportando il meccanismo di *soft delete* adottato dall'intera applicazione.
+Tutti gli oggetti persistenti ereditano da `BaseEntity`, una *MappedSuperclass* che fornisce i campi comuni a tutte le entità: `id`, `isDeleted`, `deletedAt`, `lastModified` e `createdDate`, garantendo uniformità e supportando il meccanismo di *soft delete* adottato dall'intera applicazione.
 
 #### Gerarchia degli Utenti
 
@@ -459,277 +456,15 @@ Definita in `SecurityConfig.java`. Le regole sono valutate **top-to-bottom**: la
 | `GET /swagger-ui/**`, `/v3/api-docs/**` | No | | Sì |
 | Qualsiasi altra richiesta (`.anyRequest()`) | No | Sì | |
 
-> **Nota V-16 (catalogo):** GET su cars/brands/colors/ecc. usa `authenticated()` (qualsiasi utente loggato). POST/PUT/DELETE sugli stessi path usa `hasRole("ADMIN")`. Due regole separate valutate in ordine - la prima che matcha GET vince, POST/PUT/DELETE cadono sulla seconda regola.
+---
+
+https://developer.mozilla.org/en-US/docs/Web/HTTP/Status).
 
 ---
 
-## 4. API Reference
+## 4. Containerizzazione
 
-> Base URL: `http://localhost:8080`
-> Documentazione interattiva: `http://localhost:8080/swagger-ui/index.html` (solo ADMIN)
-
-Tutte le risposte seguono un wrapper uniforme con i campi `data`, `message` e `success`. Per i codici di stato HTTP standard, vedi [MDN HTTP Status Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status).
-
----
-
-### 4.1 Autenticazione - `/api/v1/auth`
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| `POST` | `/api/v1/auth/signup` | Registrazione nuovo utente |
-| `POST` | `/api/v1/auth/signin` | Login e ottenimento JWT |
-| `POST` | `/api/v1/auth/isUserTrue` | Verifica credenziali |
-| `POST` | `/api/v1/auth/logout` | Logout con revoca token |
-
-`signup` richiede nome, cognome, email, telefono, password e tipo utente; restituisce `accessToken`, `refreshToken` e `expiresIn`. `signin` riceve email e password, restituisce gli stessi campi token. `isUserTrue` verifica le credenziali senza emettere token. `logout` revoca il token corrente.
-
----
-
-### 4.2 Refresh Token - `/api/v1/refresh-token`
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| `POST` | `/api/v1/refresh-token/` | Rinnovo access token (monouso - risposta include nuovo refreshToken) |
-
-Richiede il `refreshToken` nel body; il token è monouso - la risposta include sia il nuovo `accessToken` che un nuovo `refreshToken`.
-
----
-
-### 4.3 Verifica Email - `/api/v1/verify`
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| `GET` | `/api/v1/verify/email?token=X` | Conferma indirizzo email tramite OTP |
-
-Il token OTP viene inviato via email all'indirizzo registrato; la verifica attiva l'account e abilita il login.
-
----
-
-### 4.4 Utenti - `/api/v1/users`
-
-| Metodo | Path | Parametri | Descrizione |
-|--------|------|-----------|-------------|
-| `GET` | `/api/v1/users/` | `page`, `size` (Pageable) | Lista utenti paginata |
-| `GET` | `/api/v1/users/` | `isDeleted=true\|false` | Filtra per stato eliminazione |
-| `GET` | `/api/v1/users/{id}` | path: `id` | Utente per ID |
-| `GET` | `/api/v1/users/count/{isDeleted}` | path: `isDeleted` | Conteggio utenti |
-| `PUT` | `/api/v1/users/updatePassword` | body JSON | Aggiorna password |
-| `PUT` | `/api/v1/users/block/{id}` | path: `id` | Blocca utente |
-
-Tutti gli endpoint richiedono ruolo ADMIN. La lista utenti è paginabile tramite i parametri Pageable standard di Spring (`page`, `size`, `sort`).
-
----
-
-### 4.5 Amministratori - `/api/v1/admins`
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| `POST` | `/api/v1/admins/` | Crea amministratore |
-| `PUT` | `/api/v1/admins/` | Aggiorna amministratore |
-| `GET` | `/api/v1/admins/` | Lista tutti gli amministratori |
-| `GET` | `/api/v1/admins/{id}` | Amministratore per ID |
-| `GET` | `/api/v1/admins/?isDeleted=X` | Filtra per stato eliminazione |
-| `GET` | `/api/v1/admins/count/{isDeleted}` | Conteggio amministratori |
-| `DELETE` | `/api/v1/admins/?id=X&isHardDelete=true\|false` | Elimina (soft o hard) |
-
-La creazione richiede dati anagrafici, credenziali, stipendio e il campo `adminType`.
-
----
-
-### 4.6 Clienti - `/api/v1/customers`
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| `POST` | `/api/v1/customers/` | Crea cliente |
-| `PUT` | `/api/v1/customers/` | Aggiorna cliente |
-| `GET` | `/api/v1/customers/` | Lista tutti i clienti |
-| `GET` | `/api/v1/customers/{id}` | Cliente per ID |
-| `GET` | `/api/v1/customers/rentals/{customerId}` | Storico noleggi del cliente |
-| `GET` | `/api/v1/customers/?isDeleted=X` | Filtra per stato eliminazione |
-| `GET` | `/api/v1/customers/count/{isDeleted}` | Conteggio clienti |
-| `GET` | `/api/v1/customers/countByStatus/{status}` | Conteggio per stato |
-| `DELETE` | `/api/v1/customers/?id=X&isHardDelete=true\|false` | Elimina (soft o hard) |
-
-Endpoint ad accesso ADMIN. L'eliminazione soft marca il record come eliminato logicamente (`isDeleted=true`) senza rimuoverlo dal database.
-
----
-
-### 4.7 Dipendenti - `/api/v1/employees`
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| `POST` | `/api/v1/employees/` | Crea dipendente |
-| `PUT` | `/api/v1/employees/` | Aggiorna dipendente |
-| `GET` | `/api/v1/employees/` | Lista tutti i dipendenti |
-| `GET` | `/api/v1/employees/{id}` | Dipendente per ID |
-| `GET` | `/api/v1/employees/phone/{phoneNumber}` | Dipendente per numero di telefono |
-| `GET` | `/api/v1/employees/?startSalary=X&endSalary=Y` | Filtra per fascia di stipendio |
-| `GET` | `/api/v1/employees/?isDeleted=X` | Filtra per stato eliminazione |
-| `GET` | `/api/v1/employees/count/{isDeleted}` | Conteggio dipendenti |
-| `DELETE` | `/api/v1/employees/?id=X&isHardDelete=true\|false` | Elimina (soft o hard) |
-
-Endpoint ad accesso ADMIN. Supporta filtro per fascia di stipendio e recupero diretto per numero di telefono.
-
----
-
-### 4.8 Veicoli - `/api/v1/cars`
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| `POST` | `/api/v1/cars/` | Crea veicolo |
-| `PUT` | `/api/v1/cars/` | Aggiorna veicolo |
-| `GET` | `/api/v1/cars/` | Lista tutti i veicoli |
-| `GET` | `/api/v1/cars/{id}` | Veicolo per ID |
-| `GET` | `/api/v1/cars/count/{isDeleted}` | Conteggio veicoli |
-| `GET` | `/api/v1/cars/countByStatus/{statusId}` | Conteggio per stato |
-| `GET` | `/api/v1/cars/?startDate=X&endDate=Y` | Veicoli disponibili nel periodo |
-| `GET` | `/api/v1/cars/?isDeleted=X` | Filtra per stato eliminazione |
-| `GET` | `/api/v1/cars/filter` | Ricerca avanzata multi-criterio |
-| `DELETE` | `/api/v1/cars/?id=X&isHardDelete=true\|false` | Elimina (soft o hard) |
-
-#### `GET /api/v1/cars/filter` - Parametri di ricerca avanzata
-
-| Parametro | Tipo | Descrizione |
-|-----------|------|-------------|
-| `customerId` | Long | Filtra veicoli compatibili con la patente del cliente |
-| `licenseSuitable` | Boolean | Solo veicoli adatti alla patente del cliente |
-| `startDate` | LocalDate | Data inizio noleggio desiderata |
-| `endDate` | LocalDate | Data fine noleggio desiderata |
-| `brandId` | Long | Marca |
-| `modelId` | Long | Modello |
-| `colorId` | Long | Colore |
-| `fuelTypeId` | Long | Tipo carburante |
-| `shiftTypeId` | Long | Tipo cambio |
-| `seat` | Integer | Numero posti |
-| `luggage` | Integer | Capacità bagagli |
-| `startPrice` | Double | Prezzo giornaliero minimo |
-| `endPrice` | Double | Prezzo giornaliero massimo |
-| `startYear` | Integer | Anno immatricolazione minimo |
-| `endYear` | Integer | Anno immatricolazione massimo |
-| `isDeleted` | Boolean | Includi eliminati logicamente |
-| `statusId` | Long | Stato veicolo |
-| `segmentId` | Long | Segmento |
-
-La creazione richiede targa, chilometraggio, anno, posti, bagagli, prezzo giornaliero e gli ID di colore, carburante, cambio, stato, modello, carrozzeria, segmento e tipo patente richiesta.
-
----
-
-### 4.9 Noleggi - `/api/v1/rentals`
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| `POST` | `/api/v1/rentals/showRental` | Anteprima noleggio con costi |
-| `POST` | `/api/v1/rentals/` | Crea noleggio |
-| `PUT` | `/api/v1/rentals/` | Aggiorna noleggio |
-| `PUT` | `/api/v1/rentals/startRental/{rentalId}` | Avvia noleggio (segna come attivo) |
-| `PUT` | `/api/v1/rentals/returnRental` | Registra restituzione veicolo |
-| `PUT` | `/api/v1/rentals/cancelRental/{rentalId}` | Cancella noleggio |
-| `GET` | `/api/v1/rentals/` | Lista tutti i noleggi |
-| `GET` | `/api/v1/rentals/statuses` | Lista stati noleggio |
-| `GET` | `/api/v1/rentals/{id}` | Noleggio per ID |
-| `GET` | `/api/v1/rentals/?isDeleted=X` | Filtra per stato eliminazione |
-| `GET` | `/api/v1/rentals/?statusId=X` | Filtra per stato noleggio |
-| `GET` | `/api/v1/rentals/count/{isDeleted}` | Conteggio noleggi |
-| `GET` | `/api/v1/rentals/countByStatus/{status}` | Conteggio per stato |
-| `DELETE` | `/api/v1/rentals/?id=X&isHardDelete=true\|false` | Elimina (soft o hard) |
-
-`showRental` riceve ID cliente, ID auto, date e codice sconto opzionale; restituisce anteprima con giorni, prezzo giornaliero, percentuale sconto e totale. `returnRental` riceve l'ID noleggio, la data di restituzione e il chilometraggio finale.
-
----
-
-### 4.10 Pagamenti - `/api/v1/paymentDetails` e `/api/v1/paymentTypes`
-
-#### Payment Details
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| `PUT` | `/api/v1/paymentDetails/` | Aggiorna dettagli pagamento |
-| `GET` | `/api/v1/paymentDetails/{id}` | Dettaglio per ID |
-| `GET` | `/api/v1/paymentDetails/` | Lista tutti i pagamenti |
-| `GET` | `/api/v1/paymentDetails/monthlyIncome?startDate=X&endDate=Y` | Ricavi mensili nel periodo |
-| `GET` | `/api/v1/paymentDetails/yearlyIncome?year=X` | Ricavi totali nell'anno |
-| `GET` | `/api/v1/paymentDetails/totalIncome` | Ricavi totali assoluti |
-| `GET` | `/api/v1/paymentDetails/filter?minAmount=X&maxAmount=Y&minDate=X&maxDate=Y&isDeleted=X` | Filtra pagamenti |
-
-#### Payment Types
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| `PUT` | `/api/v1/paymentTypes/` | Aggiorna tipo pagamento |
-| `GET` | `/api/v1/paymentTypes/` | Lista tutti i tipi |
-| `GET` | `/api/v1/paymentTypes/{id}` | Tipo per ID |
-| `GET` | `/api/v1/paymentTypes/?isActive=true\|false` | Filtra per stato attivo |
-
-I dettagli di pagamento sono creati automaticamente alla chiusura di un noleggio; gli endpoint di report (`monthlyIncome`, `yearlyIncome`, `totalIncome`) richiedono ruolo ADMIN. I tipi di pagamento sono una lookup table configurabile (carte, contanti, ecc.).
-
----
-
-### 4.11 Sconti - `/api/v1/discounts`
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| `POST` | `/api/v1/discounts/` | Crea codice sconto |
-| `PUT` | `/api/v1/discounts/` | Aggiorna codice sconto |
-| `GET` | `/api/v1/discounts/` | Lista tutti gli sconti |
-| `GET` | `/api/v1/discounts/{id}` | Sconto per ID |
-| `GET` | `/api/v1/discounts/code/{discountCode}` | Sconto per codice testuale |
-| `GET` | `/api/v1/discounts/?isDeleted=X` | Filtra per stato eliminazione |
-| `GET` | `/api/v1/discounts/?isActive=true\|false` | Filtra per stato attivo |
-| `DELETE` | `/api/v1/discounts/?id=X&isHardDelete=true\|false` | Elimina (soft o hard) |
-
-La creazione richiede il codice testuale, la percentuale di sconto e il flag `isActive`.
-
----
-
-### 4.12 Patenti di Guida - `/api/v1/drivingLicenseType`
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| `POST` | `/api/v1/drivingLicenseType/` | Crea tipo patente |
-| `PUT` | `/api/v1/drivingLicenseType/` | Aggiorna tipo patente |
-| `GET` | `/api/v1/drivingLicenseType/` | Lista tutti i tipi di patente |
-| `GET` | `/api/v1/drivingLicenseType/{id}` | Tipo patente per ID |
-| `GET` | `/api/v1/drivingLicenseType/?isDeleted=X` | Filtra per stato eliminazione |
-| `DELETE` | `/api/v1/drivingLicenseType/?id=X&isHardDelete=true\|false` | Elimina (soft o hard) |
-
-Lookup table per i tipi di patente richiesti dai veicoli (A, B, BE, ecc.). Modificabile solo da ADMIN.
-
----
-
-### 4.13 Caratteristiche Veicolo
-
-Tutti gli endpoint seguono il pattern CRUD standard con `POST /`, `PUT /`, `GET /`, `GET /{id}`, `GET ?isDeleted=X`, `DELETE ?id=X&isHardDelete=true|false`.
-
-| Risorsa | Base Path |
-|---------|-----------|
-| Marche | `/api/v1/brands` |
-| Modelli auto | `/api/v1/carModels` |
-| Carrozzerie | `/api/v1/carBodyTypes` |
-| Segmenti | `/api/v1/car-segments` |
-| Colori | `/api/v1/colors` |
-| Tipi carburante | `/api/v1/fuels` |
-| Tipi cambio | `/api/v1/gearshifts` |
-| Stati veicolo | `/api/v1/vehicle-statuses` |
-
-> **Nota:** `/api/v1/carModels` espone anche `GET /brands/{brandId}` per filtrare i modelli per marca.
-
----
-
-### 4.14 Immagini - `/api/v1/images`
-
-| Metodo | Path | Parametri Form | Descrizione |
-|--------|------|----------------|-------------|
-| `POST` | `/api/v1/images/car` | `file` (MultipartFile), `licensePlate` | Carica immagine auto |
-| `POST` | `/api/v1/images/user` | `file` (MultipartFile), `emailAddress` | Carica immagine profilo utente |
-| `POST` | `/api/v1/images/brand` | `file` (MultipartFile), `brandName` | Carica immagine brand |
-
-Le immagini vengono caricate su **Cloudinary** e l'URL viene salvato nel database.
-
----
-
-## 5. Containerizzazione
-
-### 5.1 Dockerfile Backend ([`rentACar_backend/Dockerfile`](Dockerfile))
+### 4.1 Dockerfile Backend ([`rentACar_backend/Dockerfile`](Dockerfile))
 
 Il backend adotta un **multi-stage build** in due fasi distinte: una per la compilazione, una per l'esecuzione. L'immagine finale non contiene Maven, il JDK, i sorgenti né i file `.class` intermedi - solo il JAR eseguibile.
 
@@ -747,7 +482,7 @@ Il backend adotta un **multi-stage build** in due fasi distinte: una per la comp
 
 ---
 
-### 5.2 Dockerfile Frontend ([`rent-a-car-frontend-project/Dockerfile`](../rent-a-car-frontend-project/Dockerfile))
+### 4.2 Dockerfile Frontend ([`rent-a-car-frontend-project/Dockerfile`](../rent-a-car-frontend-project/Dockerfile))
 
 Anche il frontend adotta multi-stage: Node per la build React, nginx Alpine per il serving. L'immagine finale non contiene Node.js, npm né i sorgenti TypeScript.
 
@@ -764,7 +499,7 @@ Anche il frontend adotta multi-stage: Node per la build React, nginx Alpine per 
 
 ---
 
-### 5.3 Docker Compose ([`rentACar_backend/docker-compose.yml`](docker-compose.yml))
+### 4.3 Docker Compose ([`rentACar_backend/docker-compose.yml`](docker-compose.yml))
 
 Il file orchestra tre servizi - `postgres`, `app` (backend), `frontend` - su una rete bridge privata. L'unica porta esposta all'host è la 8080 (nginx), tutto il resto comunica internamente.
 
@@ -793,11 +528,11 @@ Host (porta 8080)
 
 ---
 
-## 6. Vulnerabilità Identificate - Audit Manuale
+## 5. Vulnerabilità Identificate tramite Fase di Testing
 
 L'analisi si è svolta in due round distinti di audit statico del codice sorgente, seguendo il framework OWASP Top 10 2021 e CWE come riferimento tecnico. Il primo round ha rilevato 14 vulnerabilità e un flaw architetturale critico (`anyRequest().permitAll()` come regola globale); il secondo round ha identificato 14 vulnerabilità aggiuntive più sottili nel frontend e nella logica di business. **Totale: 29 vulnerabilità - tutte risolte.**
 
-### 6.1 Vulnerabilità Identificate
+### 5.1 Vulnerabilità Identificate
 
 | Round | ID | Titolo | Gravità | OWASP | CWE | Stato |
 |:-----:|----|--------|---------|-------|-----|:-----:|
@@ -831,7 +566,7 @@ L'analisi si è svolta in due round distinti di audit statico del codice sorgent
 | 2 | V-13 | Swagger accessibile a qualsiasi utente autenticato (non solo ADMIN) | Bassa | A05 | 284 | Risolto |
 | 2 | V-14 | Nessun blocco account dopo N tentativi di login falliti | Bassa | A07 | 307 | Risolto |
 
-### 6.2 Patch Applicate
+### 5.2 Patch Applicate
 
 | Round | ID | Patch |
 |:-----:|----|-------|
@@ -866,7 +601,7 @@ L'analisi si è svolta in due round distinti di audit statico del codice sorgent
 | 2 | **V-14** | `AccountLockoutService`: blocco account dopo 5 tentativi falliti con reset automatico dopo timeout |
 
 ---
-## 7. Strumenti di Sicurezza Automatici
+## 6. Strumenti di Sicurezza Automatici
 
 Il progetto integra cinque tool di analisi della sicurezza, ciascuno con uno scope diverso:
 
@@ -880,13 +615,13 @@ Il progetto integra cinque tool di analisi della sicurezza, ciascuno con uno sco
 
 ---
 
-### 7.1 GitGuardian - Secret Detection
+### 6.1 GitGuardian - Secret Detection
 
 GitGuardian scansiona il repository alla ricerca di credenziali hardcoded (API key, token, password) nel codice corrente e nella storia dei commit. Nel workflow CI il job usa `ggshield` in modalità path scan: blocca solo se trova segreti nel codice del branch corrente.
 
 **Finding nel codice corrente:** nessuno. Il CI passa perché `application.properties` è in `.gitignore` e nessuna credenziale è presente nei file committati.
 
-**Finding nella storia dei commit:** GitGuardian ha rilevato segreti in commit storici appartenenti al **fork originale** del progetto (team turco "tobeto", 2023-2024), prima che questo team prendesse il repository.
+**Finding nella storia dei commit:** GitGuardian ha rilevato segreti in commit storici appartenenti al **fork originale** del progetto (team turco "tobeto", 2023-2024), prima che il nostro team "forkasse" il repository.
 
 | Tipo | Valore (parziale) | Commit | Azione |
 |------|-------------------|--------|--------|
@@ -896,11 +631,11 @@ GitGuardian scansiona il repository alla ricerca di credenziali hardcoded (API k
 | PostgreSQL password | `14531453`, `123asd123` | commit iniziali | Ignorati (fork originale) |
 | AWS RDS endpoint | `tobeto-extendrent.cb48o06...` | commit iniziali | Ignorati (fork originale) |
 
-**Perché ignorati e non FP:** questi segreti sono reali (non placeholder), ma appartengono all'account del team originale, non a questo deployment. Sono stati marcati come **"Ignored - Risk Accepted"** sul dashboard GitGuardian con la motivazione "credenziali del fork originale, non di questo team". La riscrittura della storia git (`git filter-repo`) è stata valutata ma scartata: i segreti appartengono a un account terzo e sono presumibilmente già scaduti/ruotati; la riscrittura forzata richiederebbe un force push e il re-clone da parte di tutti i collaboratori.
+**Perché ignorati e non FP:** questi segreti sono reali (non placeholder), ma appartengono all'account del team originale, non a questo deployment. Sono stati marcati come **"Ignored - Risk Accepted"** sul dashboard GitGuardian con la motivazione "credenziali del fork originale, non di questo team", e la riscrittura forzata avrebbe richiesto un force push e il re-clone da parte di tutti i collaboratori.
 
 ---
 
-### 7.2 Snyk - Software Composition Analysis (SCA)
+### 6.2 Snyk - Software Composition Analysis (SCA)
 
 Snyk analizza le dipendenze Maven del backend e le dipendenze Node del frontend, confrontandole con il database di CVE. Nel branch analizzato erano presenti **12 alert** (5 High, 4 Medium, 3 Low). Tutti risolti.
 
@@ -931,7 +666,7 @@ Snyk analizza le dipendenze Maven del backend e le dipendenze Node del frontend,
 
 ---
 
-### 7.3 Semgrep - SAST Pattern-Based
+### 6.3 Semgrep - SAST Pattern-Based
 
 Semgrep ha rilevato **4 finding** (tutti nello stesso file di regola: `java.lang.security.audit.active-debug-code-printstacktrace`, CWE-209 / CWE-489). Nessun falso positivo.
 
@@ -964,7 +699,7 @@ Tutti e quattro i finding sono stati risolti. Nessun finding di Semgrep è stato
 
 ---
 
-### 7.4 SonarCloud - SAST + Quality Gate + Coverage
+### 6.4 SonarCloud - SAST + Quality Gate + Coverage
 
 SonarCloud analizza il codice sorgente con analisi statica dataflow, calcola la copertura del codice tramite i report JaCoCo prodotti nel job `security-tests`, e applica un quality gate prima del merge. Due istanze separate: una per il backend Java, una per il frontend TypeScript.
 
@@ -980,7 +715,7 @@ Non vengono riportati finding specifici di SonarCloud perché i finding di anali
 
 ---
 
-### 7.5 Trivy - Container Security Scanning
+### 6.5 Trivy - Container Security Scanning
 
 Trivy scansiona l'immagine Docker del backend alla ricerca di CVE nei pacchetti OS (Debian/Alpine) e nelle dipendenze applicative. Il job `publish` in `deploy.yml` esegue tre step sequenziali:
 
@@ -1011,7 +746,7 @@ L'approccio VEX (Vulnerability Exploitability eXchange) per sopprimere queste CV
 
 ---
 
-## 8. Test di Sicurezza
+## 7. Test di Sicurezza
 
 La strategia di testing adottata è **incentrata sulla sicurezza**, non sulla correttezza funzionale: il 95% della suite (403 test su 424) verifica il comportamento del sistema in scenari di attacco o accesso non autorizzato, seguendo la tassonomia **OWASP Top 10 2021**. La suite è completamente indipendente dall'ambiente di produzione - usa H2 in-memory per il web layer, non effettua chiamate a Cloudinary o SMTP, e il rate limiting è disabilitabile via `app.rate-limit.enabled=false` nel profilo `test` - garantendo che ogni test sia riproducibile senza configurazione esterna.
 
@@ -1502,11 +1237,11 @@ Verifica che al logout il refresh token venga invalidato nella tabella `refresh_
 
 ---
 
-## 9. Pipeline CI/CD
+## 8. Pipeline CI/CD
 
-La pipeline è strutturata su due livelli distinti: un livello root che governa l'intero monorepo (backend + frontend) e un livello dedicato al solo backend con una pipeline più granulare. I due livelli sono indipendenti e si attivano su branch diversi, ma condividono gli stessi strumenti di sicurezza.
+La pipeline è strutturata su due livelli distinti: un livello root che governa la parte di backend + frontend e un livello dedicato al solo backend con una pipeline più granulare. I due livelli sono indipendenti e si attivano su branch diversi, ma condividono gli stessi strumenti di sicurezza.
 
-### 9.1 Livello Root ([`.github/workflows/`](https://github.com/aaselli2-unisa/rentACar_backend/tree/master/.github/workflows))
+### 8.1 Livello Root ([`.github/workflows/`](https://github.com/aaselli2-unisa/rentACar_backend/tree/master/.github/workflows))
 
 Il livello root si attiva su push e PR verso `main`/`develop` e copre contemporaneamente backend e frontend. È composto da due workflow separati con responsabilità distinte.
 
@@ -1532,7 +1267,7 @@ Il workflow di sicurezza è separato dal CI per due motivi: può girare su sched
 | `sonarcloud-backend` | SonarCloud `mvn verify sonar:sonar` | Quality gate + coverage Java |
 | `sonarcloud-frontend` | SonarCloud `sonarcloud-github-action` | Quality gate + coverage TypeScript |
 
-### 9.2 Livello Backend ([`rentACar_backend/.github/workflows/`](https://github.com/aaselli2-unisa/rentACar_backend/tree/master/rentACar_backend/.github/workflows))
+### 8.2 Livello Backend ([`rentACar_backend/.github/workflows/`](https://github.com/aaselli2-unisa/rentACar_backend/tree/master/rentACar_backend/.github/workflows))
 
 Il backend ha una pipeline propria, più granulare, che si attiva su push/PR verso `master-dev`/`master`. È composta da 7 job con dipendenze esplicite. Il DAG è pensato per minimizzare il tempo di feedback: `gitguardian` gira subito in parallelo a tutto il resto (non ha bisogno del codice compilato), `compile` è il gate che sblocca tutti i job successivi.
 
@@ -1571,7 +1306,7 @@ Il deploy è intenzionalmente separato dalla CI: si attiva solo con un tag Git e
 | Trivy SARIF | Scansiona tutte le severità (`exit-code: 0`), carica risultati su GitHub Security tab |
 | Trivy gate | Blocca solo su CRITICAL/HIGH con fix disponibile (`ignore-unfixed: true`, `exit-code: 1`) |
 
-### 9.3 Sicurezza della Pipeline
+### 8.3 Sicurezza della Pipeline
 
 Ogni workflow applica il principio del minimo privilegio: i permessi sono dichiarati globalmente come `contents: read` e i job che necessitano di privilegi aggiuntivi (upload SARIF, push su GHCR) li dichiarano esplicitamente a livello di job. Tutti i job hanno `timeout-minutes` espliciti - senza timeout, un job appeso consumerebbe minuti runner illimitati e potrebbe bloccare altri workflow. I secret non compaiono mai nel codice: vengono letti dai GitHub Secrets e iniettati come variabili d'ambiente dal runner.
 
@@ -1582,7 +1317,7 @@ Ogni workflow applica il principio del minimo privilegio: i permessi sono dichia
 | Deploy separato dal CI | `deploy.yml` si attiva su push tag `v*.*.*` - il deploy di produzione richiede una decisione esplicita (git tag), non è automatico ad ogni push |
 | Nessun secret nel codice | `GITHUB_TOKEN` come variabile nativa GitHub; `SNYK_TOKEN`, `SEMGREP_APP_TOKEN`, `GITGUARDIAN_API_KEY`, `SONAR_TOKEN` come GitHub Secrets |
 
-### 9.4 Segreti Pipeline
+### 8.4 Segreti Pipeline
 
 | Nome | Pipeline | Utilizzo |
 |------|:--------:|---------|
@@ -1597,165 +1332,3 @@ Ogni workflow applica il principio del minimo privilegio: i permessi sono dichia
 | `SONAR_PROJECT_KEY` | Backend | Chiave progetto SonarCloud |
 
 ---
-
-## 10. Kubernetes
-
-ExtendRent è stato deployato su un server Ubuntu con **microk8s** (Kubernetes single-node). Il deployment è completamente operativo.
-
-### 10.1 Architettura
-
-```
-Internet
-  └── nginx-ingress-controller :80 (microk8s addon)
-        └── Service rentacar-frontend :80→8080
-              └── Pod nginx (React SPA + reverse proxy)
-                    └── /api/* → proxy_pass → Service rentacar-app :8080
-                                                └── Pod Spring Boot
-                                                      └── Service postgres :5432
-                                                            └── Pod PostgreSQL + PVC 5Gi
-```
-
-Il backend non è mai esposto direttamente a internet. Tutto il traffico esterno passa per il frontend nginx, che agisce da reverse proxy per `/api/`.
-
-### 10.2 Setup microk8s
-
-```bash
-sudo snap install microk8s --classic --channel=1.32/stable
-sudo usermod -aG microk8s $USER
-newgrp microk8s
-
-microk8s enable dns
-microk8s enable storage
-microk8s enable ingress
-```
-
-| Addon | Funzione |
-|-------|----------|
-| `dns` | CoreDNS: i pod si raggiungono per nome (`postgres`, `rentacar-app`) - service discovery interna |
-| `storage` | hostpath-provisioner: soddisfa PVC mappandole su directory locali del nodo (dati PostgreSQL) |
-| `ingress` | nginx-ingress-controller nel namespace `ingress`: riceve traffico :80 e instrada ai Service K8s |
-
-### 10.3 Secrets
-
-I segreti K8s sono separati dai manifest (che sono su git). Ogni credenziale è un file in `secrets/` (`.gitignore`):
-
-```
-secrets/
-  DB_PASSWORD          # password PostgreSQL
-  JWT_SECRET
-  CLOUDINARY_CLOUD_NAME
-  CLOUDINARY_API_KEY
-  CLOUDINARY_API_SECRET
-  MAIL_USERNAME
-  MAIL_PASSWORD
-```
-
-> **Critico - formato secrets:** usare sempre `echo -n` (senza newline finale). Un newline in coda causa autenticazioni fallite perché la password viene letta come `password\n`.
-
-```bash
-echo -n "valore_secret" > secrets/NOME_SECRET
-bash k8s/setup-secrets.sh   # crea K8s Secret "rentacar-secrets" nel namespace rentacar
-```
-
-Il Secret viene montato nei pod come volume: K8s crea un file per ogni chiave in `/run/secrets/`. Spring Boot con profilo `docker` legge le credenziali da questi file.
-
-### 10.4 Build e Push Immagini
-
-K8s non builda immagini: le scarica da un registry. Le immagini vengono buildate e pushate su GHCR (`ghcr.io`) tramite `deploy.yml` al push di un tag versione.
-
-```bash
-# Deploy manuale da workflow_dispatch (GitHub Actions UI)
-# oppure tramite tag git:
-git tag v1.2.3 && git push origin v1.2.3
-```
-
-### 10.5 Manifest Kubernetes
-
-Lo script `k8s/deploy.sh` applica i manifest in ordine numerico (l'ordine è importante):
-
-| File | Risorsa | Perché prima |
-|------|---------|--------------|
-| `00-namespace.yaml` | Namespace `rentacar` | Tutti gli altri oggetti appartengono a questo namespace |
-| `01-configmap.yaml` | ConfigMap `rentacar-config` | I Deployment referenziano il ConfigMap via `envFrom` - deve esistere prima |
-| `02-postgres.yaml` | PVC + Deployment + Service postgres | Il pod Spring Boot usa un initContainer che aspetta postgres |
-| `03-app.yaml` | Deployment + Service Spring Boot | initContainer blocca fino a postgres:5432 disponibile |
-| `04-frontend.yaml` | Deployment + Service nginx | Si avvia subito; le call API aspettano Spring Boot |
-| `04b-nginx-config.yaml` | ConfigMap nginx | Contiene `nginx.conf` con `listen 8080` e proxy `/api/` |
-| `05-ingress.yaml` | Ingress | Il Service `rentacar-frontend` deve esistere già |
-| `06-networkpolicy.yaml` | 3 NetworkPolicy | Firewall tra componenti |
-
-**Dettagli manifest rilevanti per sicurezza:**
-
-**`03-app.yaml` (Spring Boot):**
-- `automountServiceAccountToken: false` - Spring Boot non usa l'API K8s; il mount automatico del token causava errori `read-only file system` con il filesystem restrittivo dell'immagine
-- `securityContext`: `runAsUser: 10001` (appuser), `allowPrivilegeEscalation: false`, `drop: ["ALL"]`, `seccompProfile: RuntimeDefault`
-- `initContainer wait-for-postgres`: usa `nc -z postgres 5432` in loop - K8s non avvia Spring Boot finché PostgreSQL non è raggiungibile
-- `initialDelaySeconds: 60` nelle probe: la JVM con Spring Boot impiega 30-90s per avviarsi
-
-**`04-frontend.yaml` (nginx):**
-- nginx con `runAsNonRoot: true` + `runAsUser: 101` non riesce a fare `bind()` su porta 80 (porta privilegiata) → **nginx configurato su porta 8080** tramite ConfigMap (`04b-nginx-config.yaml`)
-- Volume `emptyDir` su `/var/cache/nginx` e `/var/run` - K8s alloca filesystem temporaneo scrivibile (nginx scrive file temporanei lì senza problemi di permessi)
-- Il Service mappa `port: 80 → targetPort: 8080`, quindi dall'esterno si vede sempre porta 80
-
-**`06-networkpolicy.yaml` - NetworkPolicy (whitelist):**
-
-| Pod | Può ricevere traffico da | Porta |
-|-----|--------------------------|-------|
-| `postgres` | solo `rentacar-app` | 5432 |
-| `rentacar-app` | solo `rentacar-frontend` | 8080 |
-| `rentacar-frontend` | solo ingress-controller (namespace `ingress`) | 8080 |
-
-L'egress (traffico in uscita) è lasciato libero: Spring Boot deve raggiungere Gmail SMTP e Cloudinary, i cui IP cambiano e non è pratico bloccarli per indirizzo.
-
-### 10.6 Aggiornamenti
-
-```bash
-# Rollout di una nuova immagine (già pushata su GHCR)
-microk8s kubectl rollout restart deployment/rentacar-app -n rentacar
-microk8s kubectl rollout restart deployment/rentacar-frontend -n rentacar
-microk8s kubectl rollout status deployment/rentacar-app -n rentacar
-
-# Aggiornare un manifest YAML
-microk8s kubectl apply -f k8s/NOME_FILE.yaml
-
-# Aggiornare i secrets
-bash ~/rentacar/k8s/setup-secrets.sh
-microk8s kubectl rollout restart deployment/rentacar-app -n rentacar
-```
-
-### 10.7 Comandi utili di diagnostica
-
-```bash
-# Stato generale
-microk8s kubectl get pods -n rentacar
-microk8s kubectl get services -n rentacar
-microk8s kubectl get ingress -n rentacar
-
-# Log in tempo reale
-microk8s kubectl logs -f -n rentacar -l app=rentacar-app
-microk8s kubectl logs -f -n rentacar -l app=rentacar-frontend
-
-# Log del pod precedente (dopo crash)
-microk8s kubectl logs -n rentacar <nome-pod> --previous
-
-# Entrare nel pod Spring Boot
-microk8s kubectl exec -it deployment/rentacar-app -n rentacar -- sh
-
-# Entrare in postgres
-microk8s kubectl exec -it deployment/postgres -n rentacar -- \
-  psql -U postgres -d rentacar
-
-# Descrivere un pod (eventi, stato, volumi montati)
-microk8s kubectl describe pod <nome-pod> -n rentacar
-```
-
-### 10.8 Problemi Riscontrati e Soluzioni
-
-| Problema | Causa | Fix |
-|----------|-------|-----|
-| `x509: certificate is valid for 192.168.1.59, not 192.168.1.60` | IP LAN riassegnato da DHCP - certificato kubelet generato con vecchio IP | `sudo microk8s refresh-certs --cert ca.crt`; fix permanente: IP statico tramite netplan |
-| `mkdir "/var/cache/nginx/client_temp" failed (13: Permission denied)` | `runAsUser: 101` + directory owned da root nell'immagine | Volume `emptyDir` montato su `/var/cache/nginx` e `/var/run` |
-| `bind() to 0.0.0.0:80 failed (13: Permission denied)` | `NET_BIND_SERVICE` non applicata con `allowPrivilegeEscalation: false` + `drop: ALL` | nginx configurato su porta 8080 tramite ConfigMap |
-| `read-only file system` su service account token | K8s monta token API in `/var/run/secrets/kubernetes.io/serviceaccount`; filesystem restrittivo blocca il mountpoint | `automountServiceAccountToken: false` nel pod spec |
-| `DataNotFoundException: Customer not found` - crash seed data | Seed parzialmente eseguito al primo avvio (admin+employee creati, customer no) → riavvio salta la creazione → rental referenzia customer inesistente | `try/catch` in `Application.run()` intorno a `seedDataConfig.runFirst()` - seed failure non fatale |
-| NetworkPolicy bloccava ingress su porta errata | NetworkPolicy autorizzava solo porta 80 dopo cambio nginx a 8080 | Aggiornato `06-networkpolicy.yaml` per autorizzare porta 8080 |
