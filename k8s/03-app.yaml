@@ -20,8 +20,7 @@ metadata:
   name: rentacar-app     # Nome del Deployment
   namespace: rentacar
 spec:
-  replicas: 1            # Una sola istanza Spring Boot. L'app è stateless (JWT),
-                         # quindi in teoria scalabile, ma per demo 1 è sufficiente.
+  replicas: 1            # Una sola istanza Spring Boot.
   selector:
     matchLabels:
       app: rentacar-app  # Identifica i pod gestiti da questo Deployment
@@ -32,18 +31,18 @@ spec:
         app: rentacar-app  # Label usata da selector sopra e dal Service sotto
     spec:
 
-      automountServiceAccountToken: false
+      automountServiceAccountToken: false # Inutile in questo caso
       securityContext:
         runAsNonRoot: true      # K8s rifiuta il pod se il container gira come root
         seccompProfile:
-          type: RuntimeDefault  # Abilita il profilo seccomp di default del runtime (riduce syscall disponibili)
+          type: RuntimeDefault  # Abilita il profilo seccomp di default del runtime (syscall di default)
 
       initContainers:
         # initContainer: un container "di preparazione" che gira PRIMA del container principale.
         # K8s aspetta che tutti gli initContainer completino con exit 0 prima di avviare l'app.
         # Quindi aspetta che la porta postgres:5432 risponda prima di cedere il controllo a Spring Boot.
         - name: wait-for-postgres
-          image: busybox:1.36        # Immagine minima (~1MB) con utility di base Unix
+          image: busybox:1.36        # Immagine minima con utility di base Unix
           command:
             - sh
             - -c
@@ -65,22 +64,18 @@ spec:
         - name: rentacar-app
           # Immagine buildata e pushata dal workflow deploy.yml su Docker Hub.
           # "latest" usa sempre l'ultima versione pushata.
-          # In produzione reale si usano tag specifici (es. :v1.2.3) per
-          # garantire riproducibilità, ma per demo :latest è comodo.
           image: ben03030303/rentacar-backend:latest
 
           securityContext:
             allowPrivilegeEscalation: false  # Il processo non può ottenere più privilegi del parent
             capabilities:
               drop: ["ALL"]                  # Rimuove tutte le Linux capabilities (NET_RAW, SYS_PTRACE, ecc.)
-                                             # Il Dockerfile usa appuser (uid 10001): non serve nessuna capability
+
             runAsUser: 10001                 # UID dell'utente "appuser" creato nel Dockerfile
             runAsGroup: 10001
 
           imagePullPolicy: Always   # Ogni volta che il pod parte, verifica se c'è
-                                    # una versione più recente su Docker Hub. Con :latest
-                                    # è necessario, altrimenti K8s potrebbe usare
-                                    # la cache locale anche dopo un nuovo push.
+                                    # una versione più recente su Docker Hub.
 
           envFrom:
             - configMapRef:
@@ -104,7 +99,7 @@ spec:
                                         #   /run/secrets/CLOUDINARY_API_SECRET
                                         #   /run/secrets/MAIL_USERNAME
                                         #   /run/secrets/MAIL_PASSWORD
-                                        # Spring Boot profilo "docker" legge questi file.
+                                        # Spring Boot con profilo "docker" legge questi file.
 
               readOnly: true            # Il container non deve poter modificare i secret.
 
@@ -116,10 +111,9 @@ spec:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 60  # Spring Boot con JVM impiegherebbe 30-90s ad avviarsi.
-                                     # 60s di attesa prima del primo check evita falsi negativi.
+            initialDelaySeconds: 60  # 60s di attesa prima del primo check evita falsi negativi.
             periodSeconds: 10        # Check ogni 10 secondi
-            failureThreshold: 10     # 10 fallimenti = 100s di tolleranza → poi "not ready"
+            failureThreshold: 10     # 10 fallimenti poi "not ready"
 
           livenessProbe:
             # Se questa probe fallisce, K8s RIAVVIA il container.
@@ -135,13 +129,12 @@ spec:
             requests:
               # "requests": quantità di risorse GARANTITE al pod dal scheduler K8s.
               # K8s usa questi valori per decidere su quale nodo schedulare il pod.
-              memory: "512Mi"  # 512MB garantiti. JVM Spring Boot in idle usa ~300-400MB.
-              cpu: "250m"      # 250 millicores = 0.25 CPU. Sufficiente in idle.
+              memory: "512Mi"  # 512MB garantiti
+              cpu: "250m"      # 250 millicores = 0.25 CPU.
             limits:
               # "limits": massimo che il container può consumare.
-              # Se supera memory limit → OOMKilled (riavviato). Se supera cpu limit → throttled.
-              memory: "1Gi"    # 1GB massimo. Con -Xmx non impostato, JVM potrebbe crescere.
-                               # 1GB è sicuro per un'app Spring Boot media su 16GB RAM totali.
+              # Se supera memory limit viene riavviato. Se supera cpu limit -> throttled (rallentato).
+              memory: "1Gi"    # 1GB massimo.
               cpu: "1000m"     # 1 CPU massimo durante spike di richieste.
 
       volumes:
@@ -158,7 +151,7 @@ spec:
 #
 # il nome "rentacar-app" deve corrispondere a quello nel nginx.conf
 # del frontend (proxy_pass http://rentacar-app:8080/api/).
-# Il frontend nginx risolve "rentacar-app" tramite CoreDNS → ClusterIP di questo Service.
+# Il frontend nginx risolve "rentacar-app" tramite CoreDNS -> ClusterIP di questo Service.
 
 apiVersion: v1
 kind: Service
@@ -171,6 +164,6 @@ spec:
   ports:
     - port: 8080         # Porta esposta dal Service
       targetPort: 8080   # Porta del container Spring Boot
-  # type: ClusterIP (default) — accessibile solo dall'interno del cluster.
+  # type: ClusterIP, accessibile solo dall'interno del cluster.
   # Il backend NON è esposto direttamente a internet: tutto il traffico
-  # esterno passa per il frontend nginx che fa proxy /api/.
+  # esterno passa per il frontend nginx che fa da proxy su endpoint /api/.

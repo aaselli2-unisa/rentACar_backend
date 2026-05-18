@@ -1,0 +1,121 @@
+# CONFIGMAP nginx-conf — Configurazione nginx del frontend
+#
+# Questo ConfigMap contiene il file di configurazione nginx (default.conf)
+# che viene montato nel container frontend al posto di quello di default.
+# Abbiamo bisogno di una config personalizzata per due motivi principali:
+#   1. nginx di default ascolta sulla porta 80, che richiede i privilegi di root.
+#      Qui usiamo la porta 8080 così il container può girare come utente non privilegiato.
+#   2. Il frontend deve fare da proxy per le chiamate API verso lo Spring Boot:
+#      le richieste a /api/ vengono inoltrate internamente al pod rentacar-app
+#      senza che il browser debba conoscere l'indirizzo del backend.
+#
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-conf        # Nome referenziato in 04-frontend.yaml sotto volumes.configMap.name
+  namespace: rentacar
+data:
+  default.conf: |         # Il contenuto del file nginx /etc/nginx/conf.d/default.conf
+    server {
+        listen 8080;      # Porta 8080 invece di 80 perché il container gira senza root.
+                          # Il Service in 04-frontend.yaml mappa poi 80 → 8080.
+        server_name _;    # Underscore = catch-all: risponde a qualsiasi hostname o IP,
+                          # non abbiamo un dominio registrato.
+        root /usr/share/nginx/html;   # Directory dove nginx cerca i file statici.
+                                      # Qui vengono copiati i file React (build/) nel Dockerfile.
+        index index.html;             # File da servire
+
+        # --- Security headers ---
+        # Questi header vengono aggiunti a ogni risposta HTTP per aumentare la sicurezza.
+        # "always" li include anche nelle risposte di errore (404, 500, ecc.).
+
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        # Impedisce che la pagina venga caricata dentro un <iframe> da un altro sito.
+
+        add_header X-Content-Type-Options "nosniff" always;
+        # Impedisce al browser di "indovinare" il Content-Type di un file.
+
+        add_header X-XSS-Protection "1; mode=block" always;
+        # Attiva il filtro XSS integrato nei browser meno recenti (IE, vecchio Chrome).
+        # "mode=block" blocca la pagina invece di provare a sanificarla.
+        
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        # Controlla quante informazioni sull'URL di provenienza vengono inviate
+        # nelle richieste cross-origin. "strict-origin-when-cross-origin" manda
+        # solo il dominio (non il path completo) nelle richieste verso altri siti.
+
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        # Disabilita esplicitamente l'accesso a camera, microfono e geolocalizzazione.
+       
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self';" always;
+        # CSP (Content Security Policy): whitelist delle sorgenti da cui il browser
+        # può caricare risorse. "unsafe-inline" e "unsafe-eval" sono richiesti da react.
+
+        server_tokens off;
+        # Nasconde la versione di nginx dalle risposte HTTP (header "Server:").
+        
+        # --- Compressione gzip ---
+        gzip on;
+        # Abilita la compressione gzip delle risposte. I browser moderni supportano
+        gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+        # Lista dei Content-Type da comprimere. Non ha senso comprimere immagini
+        # (png, jpg sono già compressi)
+        gzip_min_length 1024;
+        # Comprimi solo file più grandi di 1KB.
+
+        # --- Routing React SPA ---
+        location / {
+            try_files $uri $uri/ /index.html;
+            # try_files prova nell'ordine:
+            #   $uri        → cerca il file esatto (es. /logo.png → logo.png)
+            #   $uri/       → cerca come directory (es. /fonts/ → /fonts/index.html)
+            #   /index.html → se non trova nulla, serve sempre index.html
+        }
+
+        # --- Proxy API verso Spring Boot ---
+        location /api/ {
+            proxy_pass http://rentacar-app:8080/api/;
+            # Forwarda tutte le richieste /api/* al Service K8s "rentacar-app"
+            # sulla porta 8080. "rentacar-app" viene risolto da CoreDNS (DNS interno
+            # del cluster) in modo trasparente. Il browser vede solo il frontend:
+            # non sa che il backend esiste su un pod separato.
+
+            proxy_http_version 1.1;
+            # Usa HTTP/1.1 per le connessioni verso il backend. HTTP/1.0 non supporta
+            # keep-alive, quindi ogni richiesta aprirebbe una nuova connessione TCP.
+
+            proxy_set_header Host $http_host;
+            # Passa l'header Host originale al backend
+
+            proxy_set_header X-Real-IP $remote_addr;
+            # Passa l'IP reale del client al backend. Senza questo, Spring Boot
+            # vedrebbe solo l'IP del pod nginx come IP del client.
+
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            # Header standard per catene di proxy: aggiunge l'IP del client
+            # alla lista degli IP che la richiesta ha attraversato.
+
+            proxy_set_header X-Forwarded-Proto $scheme;
+            # Comunica al backend se la richiesta originale era HTTP o HTTPS.
+
+            proxy_read_timeout 60s;
+            # Timeout per ricevere la risposta dal backend.
+        }
+
+        # --- Cache per asset statici ---
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2?)$ {
+            # Regex che matcha tutti i file con estensioni statiche.
+            # Questi file cambiano solo a ogni nuovo build, quindi possono
+            # essere messi in cache
+            expires 1y;
+            # Il browser può cachare questi file per 1 anno senza richiederli di nuovo.
+            add_header Cache-Control "public, immutable";
+            # "public": la cache può essere condivisa (CDN, proxy intermedi).
+            # "immutable": il browser non deve rivalidare il file durante il periodo
+            # di cache
+            try_files $uri =404;
+            # Se il file non esiste, restituisce 404 invece di passare a index.html. 
+            # Non ha senso fare proxy_pass a Spring Boot per asset statici.
+        }
+    }

@@ -1,4 +1,4 @@
-# CONFIGMAP — rentacar-config
+# CONFIGMAP rentacar-config
 
 # Un ConfigMap contiene coppie chiave-valore NON sensibili da iniettare
 # come variabili d'ambiente nei container. È separato dai Secret (che
@@ -26,7 +26,7 @@ data:
 
   # URL base dell'applicazione, usato per generare link
   # nelle email (es. link di reset password). Usiamo
-  # l'IP pubblico del server.
+  # l'IP pubblico (tailscale) del server.
   APP_BASE_URL: "http://100.113.22.29/"
 
   # Durata di validità del JWT in millisecondi: 86400000ms = 24 ore.
@@ -37,8 +37,6 @@ data:
   # "postgres" è il nome del Service K8s definito in 02-postgres.yaml.
   # In K8s, i Service sono raggiungibili per nome DNS all'interno dello
   # stesso namespace: postgres → 10.x.x.x (ClusterIP assegnato da K8s).
-  # In Docker Compose era identico: il container si chiamava "postgres"
-  # sulla rete rentacar-net.
   DB_URL: "jdbc:postgresql://postgres:5432/rentacar"
 
   # Username PostgreSQL. La password è in Secret (rentacar-secrets)
@@ -53,5 +51,4 @@ data:
   # Profilo Spring attivo. Il profilo "docker" carica
   # application-docker.properties che legge le password da file
   # (/run/secrets/) invece che da env vars in chiaro.
-  # Stesso valore del docker-compose.yml (environment.SPRING_PROFILES_ACTIVE).
   SPRING_PROFILES_ACTIVE: "docker"

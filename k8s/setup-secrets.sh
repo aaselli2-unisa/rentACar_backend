@@ -2,19 +2,19 @@
 
 # setup-secrets.sh — Crea K8s Secret dai file ./secrets/
 
-# Questo script va eseguito UNA VOLTA sul server Ubuntu PRIMA di fare deploy.
+# Questo script va eseguito una volta sul server Ubuntu PRIMA di fare deploy.
 # Legge i file di secret dalla directory ./secrets/ del progetto e li carica
 # in K8s come un Secret chiamato "rentacar-secrets" nel namespace "rentacar".
 #
 # Perché questo approccio:
-#   I secret NON devono stare nei manifest YAML (non committare credenziali su git).
+#   I secret NON devono stare nei manifest YAML (per non committare credenziali su git).
 #   Il Secret K8s viene creato direttamente sul server dal contenuto dei file,
 #   che esistono solo localmente (./secrets/ è in .gitignore).
 #
 # Come funziona "--dry-run=client -o yaml | kubectl apply":
 #   Invece di "kubectl create secret" (che fallisce se il secret esiste già),
 #   questa tecnica genera il manifest in memoria e usa "apply" che fa upsert:
-#   crea se non esiste, aggiorna se esiste. Idempotente.
+#   crea se non esiste, aggiorna se esiste rendendo lo script idempotente.
 #
 # Uso:
 #   Sul server Ubuntu, nella directory del progetto:

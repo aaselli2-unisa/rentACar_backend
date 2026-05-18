@@ -1,20 +1,18 @@
 # NETWORK POLICY — Firewall a livello di pod
 
 # Per default K8s non limita il traffico tra pod: qualsiasi pod nel cluster
-# può parlare con qualsiasi altro pod su qualsiasi porta. Questo è un rischio:
+# può parlare con qualsiasi altro pod su qualsiasi porta.
 # se il pod frontend venisse compromesso, potrebbe connettersi direttamente
 # al database PostgreSQL senza passare dal backend.
 #
 # Le NetworkPolicy funzionano come regole firewall applicate ai singoli pod.
 # Richiedono un plugin di rete che le supporti: microk8s usa Calico di default,
-# che supporta NetworkPolicy nativamente.
-#
-# IMPORTANTE — Come funziona la logica:
-#   - Senza NetworkPolicy: tutto permesso (ingress e egress)
-#   - Appena aggiungi UNA NetworkPolicy su un pod (via podSelector):
+
+# Come funziona la logica:
+#   - Appena aggiungiamo UNA NetworkPolicy su un pod (via podSelector):
 #     tutto il traffico del tipo specificato (Ingress o Egress) viene NEGATO
 #     per quel pod, TRANNE le eccezioni dichiarate nella policy stessa.
-#   - È una whitelist: dichiari solo cosa è permesso, il resto è negato.
+#     Policy deny all: specifichiamo cosa è permesso, il resto è negato.
 #
 # Architettura applicata — principio del minimo privilegio:
 #
@@ -24,22 +22,14 @@
 #         → app:8080         [permesso da policy 2]
 #           → postgres:5432  [permesso da policy 1]
 #
-#   Ogni freccia è esplicitamente autorizzata. Tutto il resto è bloccato.
 #   Il frontend NON può parlare con postgres. L'app NON può ricevere traffico
 #   diretto dall'esterno. Il DB è completamente isolato dall'esterno.
 #
-# Nota sull'Egress (traffico IN USCITA dai pod):
-#   Queste policy controllano solo l'Ingress (traffico in entrata).
 #   L'Egress è lasciato libero per semplicità: lo Spring Boot ha bisogno di
 #   connettersi a servizi esterni (Gmail SMTP per le email, Cloudinary per
-#   le immagini) il cui IP può cambiare e non è pratico bloccare per indirizzo.
-#   In un contesto enterprise si userebbe un egress proxy (es. Squid) o
-#   si permetterebbe solo porta 443 (HTTPS) verso l'esterno, ma per questo
-#   progetto la restrizione dell'ingress è sufficiente.
-
+#   le immagini).
 
 # 1. postgres: nega tutto, permetti solo da rentacar-app
-# Il database è il componente più critico. Solo lo Spring Boot può connettersi.
 # Il frontend nginx non può raggiungere postgres direttamente
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -94,8 +84,7 @@ spec:
 
 # Il frontend nginx riceve traffico solo dall'ingress-controller di microk8s,
 # che è il punto di ingresso ufficiale dal mondo esterno. Nessun pod interno
-# può parlare direttamente col frontend (tranne l'initContainer di app,
-# che controlla solo la porta 5432 di postgres, non questa).
+# può parlare direttamente col frontend
 #
 # namespaceSelector + podSelector insieme: il traffico deve venire DA un pod
 # con label "name: nginx-ingress-microk8s" che si trova nel namespace "ingress".

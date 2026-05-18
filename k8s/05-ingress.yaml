@@ -21,11 +21,11 @@
 #                 → PostgreSQL
 #
 #   L'Ingress manda tutto a frontend nginx. Il frontend fa proxy /api/.
-#   Spring Boot non è mai esposto direttamente a internet. Questo è
+#   Spring Boot non è mai esposto direttamente a internet: l'unico punto
+#   di ingresso dall'esterno è l'Ingress, che conosce solo il frontend.
 #
 # Configurazione senza dominio:
-#   Senza "host:" specificato, l'Ingress risponde a qualsiasi hostname
-#   e qualsiasi IP. Accessibile da http://IP-SERVER-UBUNTU/ senza DNS.
+#   Senza "host:" specificato, l'Ingress è accessibile da http://IP-SERVER-UBUNTU/ senza DNS.
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -40,8 +40,7 @@ metadata:
 
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
     # Timeout in secondi per leggere la risposta dal backend (frontend nginx,
-    # che a sua volta chiama Spring Boot). 120s è sufficiente per le API
-    # Spring Boot di questo progetto.
+    # che a sua volta chiama Spring Boot).
 
     nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
     # Timeout in secondi per inviare la richiesta al backend.
@@ -57,9 +56,8 @@ spec:
   rules:
     # Lista di regole di routing. Ogni regola può filtrare per host e path.
     - http:
-        # Nessun "host:" specificato → questa regola vale per qualsiasi hostname.
+        # Nessun "host:" specificato
         # Permette accesso tramite IP diretto (es. http://192.168.1.62/)
-        # oltre che tramite dominio (se configurato in futuro).
         paths:
           - path: /
             # Tutto il traffico che arriva su "/" e sottopercorsi va al frontend.
@@ -70,8 +68,6 @@ spec:
 
             pathType: Prefix
             # Prefix: "/" matcha "/" e tutti i sottopercorsi ("/api/cars", "/login", ecc.).
-            # Alternativa: Exact (solo "/" esatto) o ImplementationSpecific.
-            # Prefix è corretto per una SPA React con React Router.
 
             backend:
               service:
@@ -81,4 +77,5 @@ spec:
                 port:
                   number: 80
                   # Porta del Service rentacar-frontend (non del container direttamente).
-                  # Il Service poi forwarda alla containerPort 80 del pod nginx.
+                  # Il Service poi forwarda alla containerPort 8080 del pod nginx
+                  # (il container usa 8080 perché nginx gira senza root).
