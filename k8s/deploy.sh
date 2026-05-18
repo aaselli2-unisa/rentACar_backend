@@ -3,16 +3,16 @@
 # deploy.sh — Applica tutti i manifest K8s sul server Ubuntu
 
 # Questo script va eseguito sul server Ubuntu dopo aver:
-#   1. Buildato e pushato le immagini (build-push.sh sul PC Fedora)
+#   1. Buildato e pushato le immagini
 #   2. Creato i secret (setup-secrets.sh sul server)
 #
 # "kubectl apply" è idempotente: crea le risorse se non esistono,
-# le aggiorna se esistono già. Sicuro da eseguire più volte.
+# le aggiorna se esistono già.
 #
 # Ordine di apply:
 #   I file sono applicati in ordine numerico (00, 01, 02...) per rispettare
 #   le dipendenze: namespace prima di tutto, configmap prima dei deployment, ecc.
-#   Anche se K8s gestisce le dipendenze in modo asincrono, questo ordine
+#   questo ordine
 #   evita errori di riferimento a risorse non ancora create.
 #
 # Uso:
@@ -54,6 +54,6 @@ microk8s kubectl apply -f "${K8S_DIR}/06-networkpolicy.yaml"
 
 echo ""
 echo "=== Deploy completato. Stato pod: ==="
-# -w (watch): aggiorna in tempo reale finché non premi Ctrl+C
-# Mostra la progressione: Pending → ContainerCreating → Running
+# -w (watch): aggiorna in tempo reale
+# Mostra la progressione: Pending -> ContainerCreating -> Running
 microk8s kubectl get pods -n rentacar -w

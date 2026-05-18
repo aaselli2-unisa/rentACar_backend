@@ -1,27 +1,18 @@
-# POSTGRES — PersistentVolumeClaim + Deployment + Service
+# POSTGRES PersistentVolumeClaim + Deployment + Service
 
 # Questo file definisce tre risorse K8s separate che
 # insieme replicano il servizio "postgres" del docker-compose.yml:
 #
 #   1. PersistentVolumeClaim (PVC): richiesta di storage su disco per i dati DB
-#   2. Deployment: definisce come girare il container postgres:16
+#   2. Deployment: definisce come girare il container postgres
 #   3. Service: espone postgres agli altri pod per nome DNS "postgres"
-#
-# In Docker Compose il volume "pgdata" e il servizio "postgres" erano gestiti
-# automaticamente. In K8s dobbiamo dichiarare tutto esplicitamente.
-
 
 
 # 1. PersistentVolumeClaim — pgdata-pvc
-# Un PVC è una "richiesta di storage": dice al cluster "dammi 5GB di disco".
-# microk8s con l'addon "storage" soddisfa automaticamente questa richiesta
-# con un hostpath sul server Ubuntu (directory locale sul nodo).
-
-
-#   I container K8s sono effimeri, se il pod postgres viene ricreato,
-#   il filesystem interno viene distrutto. Il PVC persiste i dati anche
-#   se il pod crasha o viene eliminato. Equivalente al volume "pgdata"
-#   del docker-compose.yml.
+# Un PVC è una "richiesta di storage": come dire al cluster "mi servono 5GB di disco".
+# I container K8s sono effimeri, se il pod postgres viene ricreato,
+# il filesystem interno viene distrutto. Il PVC persiste i dati anche
+# se il pod crasha o viene eliminato.
 
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -31,8 +22,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce     # Il volume può essere montato in lettura/scrittura da UN SOLO nodo
-                        # alla volta. Corretto per PostgreSQL single-instance su single-node.
-                        # (ReadWriteMany richiederebbe NFS o storage distribuito)
+                        # alla volta. # (ReadWriteMany richiederebbe NFS o storage distribuito)
   resources:
     requests:
       storage: 5Gi      # 5 gigabyte di storage.
@@ -48,11 +38,10 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: postgres         # Nome del Deployment (non visibile dall'esterno)
+  name: postgres         # Nome del Deployment
   namespace: rentacar
 spec:
-  replicas: 1            # Una sola istanza PostgreSQL. Per DB non si fa scaling
-                         # orizzontale senza soluzioni dedicate.
+  replicas: 1            # Una sola istanza PostgreSQL.
 
   selector:
     matchLabels:
@@ -63,13 +52,13 @@ spec:
     metadata:
       labels:
         app: postgres    # Label che identifica questo pod. Usato da:
-                         # - selector.matchLabels sopra (Deployment trova i suoi pod)
-                         # - Service selector (trova i pod a cui mandare traffico)
+                         # selector.matchLabels sopra (Deployment trova i suoi pod)
+                         # Service selector (trova i pod a cui mandare traffico)
     spec:
       containers:
-        - name: postgres          # Nome del container dentro il pod (informativo)
+        - name: postgres          # Nome del container dentro il pod
           image: postgres:16      # Immagine Docker ufficiale PostgreSQL versione 16.
-                                  # Stesso tag usato nel docker-compose.yml.
+
 
           env:
             - name: POSTGRES_DB   # Nome del database da creare all'avvio del container.
@@ -91,13 +80,13 @@ spec:
           volumeMounts:
             - name: pgdata               # Monta il PVC pgdata-pvc definito sopra
               mountPath: /var/lib/postgresql/data  # Percorso standard dove postgres
-                                                   # scrive i dati. Deve essere questo esatto path.
+                                                   # scrive i dati.
 
             - name: db-secret            # Monta il Secret K8s come file
               mountPath: /run/secrets/DB_PASSWORD  # Percorso atteso da POSTGRES_PASSWORD_FILE
               subPath: DB_PASSWORD       # "subPath" monta solo la chiave "DB_PASSWORD" del Secret
                                          # come file, non l'intero Secret come directory.
-              readOnly: true             # Il container non deve scrivere il secret.
+              readOnly: true             # Il container non deve sovrascrivere il secret.
 
           readinessProbe:
             # K8s usa readinessProbe per decidere se il pod è pronto a ricevere traffico.
@@ -105,14 +94,14 @@ spec:
             exec:
               command: ["pg_isready", "-U", "postgres", "-d", "rentacar"]
               # pg_isready: utility postgres che verifica connettività al DB
-            initialDelaySeconds: 10  # Aspetta 10s prima del primo check (postgres ci mette ~5-10s ad avviarsi)
+            initialDelaySeconds: 10  # Aspetta 10s prima del primo check
             periodSeconds: 5         # Riprova ogni 5 secondi
             failureThreshold: 10     # Dopo 10 fallimenti consecutivi → pod "not ready"
 
           livenessProbe:
             # livenessProbe: se fallisce, K8s RIAVVIA il container.
             # Stessa logica di readiness ma con soglie più alte (non vogliamo
-            # riavvii frequenti su un DB che sta solo caricando dati).
+            # riavvii frequenti)
             exec:
               command: ["pg_isready", "-U", "postgres", "-d", "rentacar"]
             initialDelaySeconds: 30  # Aspetta 30s prima del primo check liveness
@@ -135,17 +124,13 @@ spec:
 # Un Service K8s espone i pod con un IP stabile e un nome DNS.
 # Senza Service, i pod hanno IP effimeri che cambiano ad ogni riavvio.
 # Con questo Service, Spring Boot può connettersi semplicemente a "postgres:5432".
-#
-# IMPORTANTE: il nome "postgres" qui deve corrispondere a "postgres" nella
-# DB_URL del ConfigMap: jdbc:postgresql://postgres:5432/rentacar
-# K8s risolve "postgres" → ClusterIP di questo Service via CoreDNS.
+# K8s risolve "postgres" -> ClusterIP di questo Service via CoreDNS.
 
 apiVersion: v1
 kind: Service
 metadata:
   name: postgres         # Nome DNS del service. Raggiungibile come "postgres" dagli
-                         # altri pod nello stesso namespace, o "postgres.rentacar.svc.cluster.local"
-                         # da altri namespace.
+                         # altri pod nello stesso namespace
   namespace: rentacar
 spec:
   selector:
