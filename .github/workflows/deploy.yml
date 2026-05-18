@@ -50,7 +50,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Calcola i tag: IMAGE:VERSION + IMAGE:latest
+      # Calcola tag: IMAGE:VERSION + IMAGE:latest
       # Esempio: Release "v1.2.3" → username/rentacar-backend:1.2.3,username/rentacar-backend:latest
       # workflow_dispatch senza release → solo :latest
       - name: Prepara tag immagine

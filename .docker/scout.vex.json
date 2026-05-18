@@ -1,0 +1,47 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/BTurino7/rentACar_backend/blob/master/.docker/scout.vex.json",
+  "author": "BTurino7",
+  "timestamp": "2026-05-13T00:00:00Z",
+  "version": 2,
+  "statements": [
+    {
+      "vulnerability": { "@id": "https://www.cve.org/CVERecord?id=CVE-2026-33811" },
+      "products": [{ "@id": "pkg:golang/stdlib@1.26.2" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "stdlib bundled in pebble binary within eclipse-temurin:17-jre. Fix in Go >= 1.26.3 not yet shipped by upstream. Remove when eclipse-temurin updates pebble."
+    },
+    {
+      "vulnerability": { "@id": "https://www.cve.org/CVERecord?id=CVE-2026-33814" },
+      "products": [
+        { "@id": "pkg:golang/stdlib@1.26.2" },
+        { "@id": "pkg:golang/golang.org/x/net@0.40.0" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "stdlib and golang.org/x/net bundled in pebble binary within eclipse-temurin:17-jre. Fix in Go >= 1.26.3 / net >= 0.53.0 not yet shipped by upstream. Remove when eclipse-temurin updates pebble."
+    },
+    {
+      "vulnerability": { "@id": "https://www.cve.org/CVERecord?id=CVE-2026-39820" },
+      "products": [{ "@id": "pkg:golang/stdlib@1.26.2" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "stdlib bundled in pebble binary within eclipse-temurin:17-jre. Fix in Go >= 1.26.3 not yet shipped by upstream. Remove when eclipse-temurin updates pebble."
+    },
+    {
+      "vulnerability": { "@id": "https://www.cve.org/CVERecord?id=CVE-2026-39836" },
+      "products": [{ "@id": "pkg:golang/stdlib@1.26.2" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "stdlib bundled in pebble binary within eclipse-temurin:17-jre. Fix in Go >= 1.26.3 not yet shipped by upstream. Remove when eclipse-temurin updates pebble."
+    },
+    {
+      "vulnerability": { "@id": "https://www.cve.org/CVERecord?id=CVE-2026-42499" },
+      "products": [{ "@id": "pkg:golang/stdlib@1.26.2" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "stdlib bundled in pebble binary within eclipse-temurin:17-jre. Fix in Go >= 1.26.3 not yet shipped by upstream. Remove when eclipse-temurin updates pebble."
+    }
+  ]
+}
