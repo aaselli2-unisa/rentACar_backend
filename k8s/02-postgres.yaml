@@ -55,10 +55,26 @@ spec:
                          # selector.matchLabels sopra (Deployment trova i suoi pod)
                          # Service selector (trova i pod a cui mandare traffico)
     spec:
+      securityContext:
+        fsGroup: 999                         # K8s cambia il gruppo del PVC a 999 (utente "postgres")
+                                             # prima di avviare il container. Garantisce che il
+                                             # processo postgres (UID 999) possa scrivere i dati
+                                             # anche su PVC creati da root (hostpath-provisioner).
+        fsGroupChangePolicy: OnRootMismatch  # Esegue il chown ricorsivo solo se la directory root
+                                             # del volume non appartiene già al gruppo corretto.
+                                             # Evita operazione lenta su dataset esistenti grandi.
+
       containers:
         - name: postgres          # Nome del container dentro il pod
           image: postgres:16      # Immagine Docker ufficiale PostgreSQL versione 16.
 
+          securityContext:
+            runAsNonRoot: true              # Il container gira come utente non-root.
+            runAsUser: 999                  # UID dell'utente "postgres" nell'immagine ufficiale.
+                                            # Con fsGroup sul pod, il PVC è già accessibile in
+                                            # scrittura da questo UID prima dell'avvio.
+            runAsGroup: 999
+            allowPrivilegeEscalation: false # Il processo non può acquisire più privilegi del parent.
 
           env:
             - name: POSTGRES_DB   # Nome del database da creare all'avvio del container.
