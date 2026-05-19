@@ -45,20 +45,6 @@ Progetto Universitario - **Andrea Aselli** · **Benedetto Pio Turino** · **Eman
    - [3.3 Ruoli](#33-ruoli)
    - [3.4 Matrice di Accesso RBAC](#34-matrice-di-accesso-rbac)
 4. [API Reference](#4-api-reference)
-   - [4.1 Autenticazione](#41-autenticazione--apiv1auth)
-   - [4.2 Refresh Token](#42-refresh-token--apiv1refresh-token)
-   - [4.3 Verifica Email](#43-verifica-email--apiv1verify)
-   - [4.4 Utenti](#44-utenti--apiv1users)
-   - [4.5 Amministratori](#45-amministratori--apiv1admins)
-   - [4.6 Clienti](#46-clienti--apiv1customers)
-   - [4.7 Dipendenti](#47-dipendenti--apiv1employees)
-   - [4.8 Veicoli](#48-veicoli--apiv1cars)
-   - [4.9 Noleggi](#49-noleggi--apiv1rentals)
-   - [4.10 Pagamenti](#410-pagamenti--apiv1paymentdetails-e-apiv1paymenttypes)
-   - [4.11 Sconti](#411-sconti--apiv1discounts)
-   - [4.12 Patenti di Guida](#412-patenti-di-guida--apiv1drivinglicensetype)
-   - [4.13 Caratteristiche Veicolo](#413-caratteristiche-veicolo)
-   - [4.14 Immagini](#414-immagini--apiv1images)
 5. [Containerizzazione](#5-containerizzazione)
    - [5.1 Dockerfile Backend](#51-dockerfile-backend-rentacar_backenddockerfile)
    - [5.2 Dockerfile Frontend](#52-dockerfile-frontend-rent-a-car-frontend-projectdockerfile)
@@ -82,8 +68,8 @@ Progetto Universitario - **Andrea Aselli** · **Benedetto Pio Turino** · **Eman
    - [8.7 Logging & Monitoring](#87-logging--monitoring--a09)
    - [Conformità OWASP Top 10 2021](#conformità-owasp-top-10-2021)
 9. [Pipeline CI/CD](#9-pipeline-cicd)
-   - [9.1 Livello Root](#91-livello-root-githubworkflows)
-   - [9.2 Livello Backend](#92-livello-backend-rentacar_backendgithubworkflows)
+   - [9.1 Workflow CI](#91-workflow-ci-githubworkflowsciyml)
+   - [9.2 Workflow Deploy](#92-workflow-deploy-githubworkflowsdeployyml)
    - [9.3 Sicurezza della Pipeline](#93-sicurezza-della-pipeline)
    - [9.4 Segreti Pipeline](#94-segreti-pipeline)
 10. [Kubernetes](#10-kubernetes)
@@ -102,7 +88,7 @@ Progetto Universitario - **Andrea Aselli** · **Benedetto Pio Turino** · **Eman
 
 ### 1.1 Descrizione dell'Applicazione
 
-**ExtendRent** è un sistema REST API per la gestione del noleggio di autoveicoli. La piattaforma gestisce l'intero ciclo di vita del noleggio - dalla registrazione del cliente alla restituzione del mezzo - con autenticazione JWT, tre ruoli applicativi e integrazione con Cloudinary (immagini) e SMTP (email OTP). Tutte le entità adottano *soft delete*: i dati non vengono mai cancellati fisicamente.
+**ExtendRent** è un sistema REST API per la gestione del noleggio di autoveicoli. La piattaforma copre l'intero ciclo di vita del noleggio, dalla registrazione del cliente alla restituzione del mezzo, con autenticazione JWT, tre ruoli applicativi e integrazione con Cloudinary (immagini) e SMTP (email OTP). Tutte le entità adottano *soft delete*: i dati non vengono mai cancellati fisicamente.
 
 Funzionalità principali:
 
@@ -112,24 +98,24 @@ Funzionalità principali:
 - **Ciclo di Vita del Noleggio**: Creazione, avvio, restituzione, cancellazione con tracciamento chilometri
 - **Pagamenti e Sconti**: Report ricavi, codici sconto con percentuale configurabile
 - **Upload Immagini**: Su Cloudinary con whitelist del tipo file (patch V07)
-- **API Documentation**: Swagger / OpenAPI, riservato al solo ADMIN (patch V13)
+- **API Documentation**: Swagger UI all'indirizzo `/swagger-ui/index.html`. Prima della patch V13 era accessibile a chiunque fosse loggato; dopo la patch richiede il ruolo ADMIN. Un Customer o un Employee che tenta di aprire quella pagina riceve 403.
 
-All'avvio, `SeedDataConfig` popola automaticamente le tabelle di lookup con i valori di default definiti nelle enum: marche, modelli, colori, tipi carburante, cambi, carrozzerie, segmenti, stati veicolo e stati noleggio, tipi di pagamento, tipi di patente di guida, utente admin di default. Il tutto viene eseguito tramite `CommandLineRunner` nella classe `Application`, con logging AOP temporaneamente disabilitato durante l'inizializzazione per evitare output ridondante.
+All'avvio, `SeedDataConfig` popola automaticamente le tabelle di lookup: marche, modelli, colori, tipi carburante, cambi, carrozzerie, segmenti, stati veicolo, stati noleggio, tipi di pagamento, tipi di patente e utente admin di default.
 
 ### 1.2 Stack Tecnologico
 
 | Tecnologia | Versione | Scopo |
 |---|---|---|
 | **Java** | 17 | Linguaggio principale |
-| **Spring Boot** | 3.5.14 | Framework REST API (aggiornato da 3.2.1 per CVE Snyk) |
+| **Spring Boot** | 3.5.14 | Framework REST API (aggiornato da 3.5.13 a 3.5.14 per CVE Snyk) |
 | **Spring Security** | 6.5.10 | Autenticazione JWT, RBAC, filter chain |
-| **Spring Data JPA + Hibernate** | (BOM) | ORM e accesso database |
-| **Spring Validation** | (BOM) | Bean validation Jakarta |
-| **Spring Mail** | (BOM) | Invio email OTP e notifiche |
-| **Spring Actuator** | (BOM) | `/actuator/health` per health check Docker |
+| **Spring Data JPA + Hibernate** | 3.5.11 / 6.6.49 | ORM e accesso database |
+| **Spring Validation** | 3.5.14 | Bean validation Jakarta |
+| **Spring Mail** | 3.5.14 | Invio email OTP e notifiche |
+| **Spring Actuator** | 3.5.14 | `/actuator/health` per health check Docker |
 | **PostgreSQL driver** | 42.7.11 | Connettività database (pinned per CVE fix) |
 | **JWT (jjwt)** | 0.11.2 | Generazione e validazione token HS256 |
-| **Bucket4j** | 8.0.1 | Rate limiting token-bucket |
+| **Bucket4j** | 8.0.1 | Rate limiting con algoritmo token-bucket (ogni IP dispone di un "secchio" di token che si ricarica a velocità fissa; ogni richiesta consuma un token; quando il secchio è vuoto si risponde 429) |
 | **Caffeine** | 3.13.0 | Cache bounded per bucket per-IP (eviction 2 min, max 50k entry) |
 | **Cloudinary SDK** | 1.27.0 | Storage immagini |
 | **commons-text** | 1.10.0 | Escape/sanitize stringhe |
@@ -137,7 +123,7 @@ All'avvio, `SeedDataConfig` popola automaticamente le tabelle di lookup con i va
 | **Swagger / OpenAPI** | 2.0.4 | Documentazione API (springdoc) |
 | **progressbar** | 0.10.0 | Progress bar ASCII durante seed dati all'avvio |
 
-
+> Le versioni dei moduli Spring (JPA, Validation, Mail, Actuator) sono gestite automaticamente dal POM padre `spring-boot-starter-parent 3.5.14`: dichiarare il parent è sufficiente perché Maven scelga versioni compatibili tra loro, senza doverle specificare una per una.
 
 **Dipendenze di test:**
 
@@ -148,17 +134,6 @@ All'avvio, `SeedDataConfig` popola automaticamente le tabelle di lookup con i va
 | `h2` | Database in-memory per i web-layer test - nessun PostgreSQL richiesto in CI |
 | `assertj-core` | Asserzioni fluent nei test di sicurezza |
 | `mockito-core` | Mock degli oggetti nei test unitari |
-
-**Override di versione per sicurezza (`pom.xml`):**
-
-| Proprietà | Versione | Motivo |
-|-----------|----------|--------|
-| `spring-boot-starter-parent` | **3.5.14** | Aggiornato da 3.5.13 - fix Snyk #71/#74/#75/#76/#77/#78/#79 |
-| `tomcat.version` | `10.1.54` | Pin esplicito oltre il default Spring Boot |
-| `spring-security.version` | `6.5.10` | Pin esplicito per CVE Spring Security |
-| `postgresql.version` | `42.7.11` | Fix Snyk #70 - Resource Allocation Without Limits |
-| `logback.version` | `1.5.25` | Fix CVE Logback |
-| `commons-lang3.version` | `3.18.0` | Allineamento versione sicura |
 
 ### 1.3 System Design - Class Diagram
 
@@ -220,10 +195,10 @@ Il progetto segue un'architettura a strati:
 
 - **`pages/`** - 30+ pagine React suddivise per dominio funzionale. Includono pagine pubbliche (Homepage, Login, SignUp), pagine per utenti autenticati (Account, PastRentals) e pagine di amministrazione protette (`adminPanel/**`).
 - **`components/`** - Componenti riutilizzabili: `Navbar`, `Search`, `Payment`, `CarCart`, `RentalDetail`, `OverlayLoader` (loading globale), `CreditCardForm`, `PasswordStrength`.
-- **`store/`** - Redux Toolkit store con 22 slice tematici (`carSlice`, `rentalSlice`, `signInSlice`, ecc.) e loading globale automatico via `addMatcher` su `pending`/`fulfilled`/`rejected`.
-- **`services/`** - Layer di comunicazione con il backend: 20+ service class che incapsulano le chiamate Axios per ogni entità (Car, Rental, Customer, Brand, Color, ecc.).
-- **`models/`** - Modelli TypeScript tipizzati per tutte le request e response, garantendo type-safety end-to-end.
-- **`utils/`** - `axiosInterceptors.ts` (istanza Axios condivisa con `withCredentials: true`) e `useToken.ts` (hook per decodare i claim JWT).
+- **`store/`** - Memoria condivisa dell'applicazione, gestita con Redux che gestisce lo stato in maniera centralizzata per i componenti.
+- **`services/`** - 20+ classi che raccolgono le chiamate al backend per ogni entità (auto, noleggi, clienti, marche, colori, ecc.). Ogni componente che ha bisogno di dati chiama il service corrispondente invece di costruire le richieste HTTP da solo.
+- **`models/`** - Definizioni TypeScript dei dati scambiati con il backend. Servono al compilatore per segnalare errori se si usa un campo sbagliato.
+- **`utils/`** - `axiosInterceptors.ts`: crea un'unica istanza Axios pre-configurata usata da tutti i service. Con `withCredentials: true` il browser include automaticamente i cookie di autenticazione in ogni chiamata. `useToken.ts`: funzione React che legge il JWT dal cookie e lo decodifica per estrarre le informazioni dell'utente corrente (ID, ruolo, email), usate dall'UI per decidere cosa mostrare.
 
 ```
 rent-a-car-frontend-project/src/
@@ -251,16 +226,18 @@ Il frontend implementa un meccanismo di autenticazione allineato con le patch di
 
 **HttpOnly Cookie**
 
-A seguito della patch **V02** (HttpOnly cookie), il frontend non memorizza più i token in `localStorage` (vettore XSS). La configurazione Axios centralizzata in `axiosInterceptors.ts` usa `withCredentials: true`, che istruisce il browser a inviare automaticamente i cookie HttpOnly su ogni richiesta API:
+Un cookie `HttpOnly` è un cookie che il codice JavaScript della pagina non può leggere: solo il browser lo gestisce, inviandolo automaticamente al server su ogni richiesta verso lo stesso dominio. Questo protegge il token di autenticazione dagli attacchi XSS (se uno script malevolo venisse iniettato nella pagina, non potrebbe rubare il token perché non lo vede).
+
+Prima della patch V02, il token JWT era salvato in `localStorage`, una zona di memoria a cui qualsiasi script in pagina ha accesso libero. Dopo la patch, il backend imposta il token come cookie `HttpOnly; Secure; SameSite=Strict` e il frontend smette di usare `localStorage`.
 
 ```ts
 const axiosInstance = axios.create({
   baseURL: config.apiBaseUrl,
-  withCredentials: true,  // invia cookie HttpOnly su ogni request
+  withCredentials: true,  // dice al browser di allegare i cookie su ogni richiesta API
 });
 ```
 
-Il campo `token` restituito dal backend nel corpo della response di signin è ora vuoto (i token viaggiano esclusivamente via cookie); il frontend decodifica il JWT via `jwt-decode` per estrarre i claim (`id`, `role`, `emailAddress`) necessari all'UI, senza mai esporre il token grezzo.
+Il backend non include più il token JWT nel corpo della risposta al login (il campo `token` è vuoto); il token viaggia solo via cookie. Il frontend ha però bisogno di sapere chi è l'utente loggato (ID, ruolo, email) per decidere cosa mostrare nell'interfaccia. Per questo, `useToken.ts` legge e decodifica il JWT direttamente dal cookie senza mai esporlo.
 
 **RBAC Lato Frontend**
 
@@ -273,7 +250,7 @@ Il RBAC frontend è un livello di UX, non una misura di sicurezza primaria: il b
 
 **Validazione Form**
 
-Tutti i form usano **Formik** con schemi **Yup** per la validazione client-side prima dell'invio:
+Tutti i form usano **Formik** con schemi **Yup** (libreria JavaScript di validazione basata su schema: si definisce la forma attesa dei dati e Yup verifica ogni campo prima dell'invio) per la validazione client-side:
 - Password: lunghezza, complessità, visualizzata con `PasswordStrength`.
 - Targa veicolo: regex formato.
 - Email: schema Yup `.email()`.
@@ -311,33 +288,13 @@ Browser
                                               (il browser non vede mai la porta 8080)
 ```
 
-**Header di sicurezza nginx (`nginx.conf`):**
-
-| Header | Scopo |
-|--------|-------|
-| `Content-Security-Policy` | Limita le origini di script, stili e connessioni - `connect-src 'self' http://rentacar-app:8080`; `script-src 'self' 'unsafe-inline' 'unsafe-eval'` |
-| `X-Frame-Options: SAMEORIGIN` | Previene clickjacking (iframe da domini esterni) |
-| `X-Content-Type-Options: nosniff` | Previene MIME type sniffing da parte del browser |
-| `X-XSS-Protection: 1; mode=block` | Blocca XSS riflesso nei browser legacy |
-| `Referrer-Policy: strict-origin-when-cross-origin` | Non espone URL completo nelle richieste cross-origin |
-| `Permissions-Policy: camera=(), microphone=(), geolocation=()` | Disabilita esplicitamente accesso a camera, microfono e geolocalizzazione |
-| `server_tokens off` | Nasconde la versione nginx dagli header di risposta |
-| `gzip on` | Compressione delle risposte per ridurre latenza |
-
-### 2.6 Flusso di Una Feature: Ricerca e Prenotazione Auto
-
-Il flusso principale dell'applicazione illustra come backend e frontend cooperano:
-
-1. **Homepage** - il componente `Search` raccoglie le date di inizio e fine noleggio tramite un date picker.
-2. **Redux Thunk** - `getByAllFilteredCars()` chiama `GET /api/v1/cars/filter?startDate=&endDate=` e salva i risultati nello store.
-3. **SelectedCar** - mostra le auto disponibili; il componente `ShowRental` calcola il prezzo (con eventuale sconto via `POST /api/v1/rentals/show`) e il componente `Payment` raccoglie i dati della carta di credito.
-4. **Checkout** - `POST /api/v1/rentals` crea il noleggio; la response aggiorna lo store e mostra il riepilogo.
-
 ---
 
 ## 3. Architettura e Ruoli
 
 ### 3.1 Struttura Generale
+
+Vista dall'esterno: come una richiesta del browser attraversa l'intero stack fino al database.
 
 ```
            Browser / Client
@@ -362,6 +319,8 @@ Il flusso principale dell'applicazione illustra come backend e frontend cooperan
 nginx è l'unico punto esposto all'host. Backend e database comunicano sulla rete bridge privata Docker `rentacar-net` e non sono mai raggiungibili dall'esterno. Questo elimina CORS (stessa origine) e nasconde la topologia interna.
 
 ### 3.2 Architettura a Layer del Backend
+
+Vista interna: i livelli attraversati da una richiesta HTTP all'interno di Spring Boot.
 
 ```
 Richiesta HTTP
@@ -405,16 +364,16 @@ Richiesta HTTP
   PostgreSQL 16
 ```
 
-**Componenti infrastrutturali trasversali (`core/`):**
+**Componenti di sicurezza e infrastruttura (`core/`):**
 
-| Componente | File | Responsabilità |
-|------------|------|----------------|
-| JWT Filter | `JwtAuthFilter.java` | Intercetta ogni richiesta, estrae e valida il token Bearer, popola il `SecurityContextHolder` |
-| Rate Limiter | `RateLimitFilter.java` | Token-bucket per IP tramite Bucket4j + Caffeine - blocca burst su `/api/**` |
-| Security Config | `SecurityConfig.java` | Definisce la filter chain, regole CORS, accesso per ruolo (vedi matrice §3.4) |
-| Exception Handler | `GlobalExceptionHandler.java` | Traduce eccezioni in risposte HTTP strutturate senza esporre stack trace o dettagli interni |
-| AOP Logging | `LoggingAspect.java` | Logging automatico di ingresso/uscita dei metodi Service tramite Spring AOP |
-| Seed Data | `SeedDataConfig.java` | Popola le tabelle di lookup all'avvio (tipi patente, stati veicolo, tipi pagamento, admin default) |
+| Componente | File | Cosa fa |
+|------------|------|---------|
+| JWT Filter | `JwtAuthFilter.java` | Su ogni richiesta: estrae il token dal cookie, ne verifica firma e scadenza, imposta l'identità dell'utente per il resto della catena |
+| Rate Limiter | `RateLimitFilter.java` | Conta le richieste per IP; blocca con HTTP 429 chi supera 10 req/min su `/api/**` |
+| Security Config | `SecurityConfig.java` | Regola centrale che definisce quali endpoint sono pubblici e quali richiedono autenticazione o ruolo specifico (vedi matrice §3.4) |
+| Exception Handler | `GlobalExceptionHandler.java` | Trasforma le eccezioni in risposte HTTP leggibili, senza mai includere stack trace o messaggi interni nella risposta al client |
+| AOP Logging | `LoggingAspect.java` | Registra automaticamente le chiamate ai metodi del Service layer senza dover aggiungere codice di log in ogni metodo |
+| Seed Data | `SeedDataConfig.java` | All'avvio del server, popola le tabelle di lookup con i dati iniziali (tipi patente, stati noleggio, admin di default) se il database è vuoto |
 
 ### 3.3 Ruoli
 
@@ -424,7 +383,7 @@ Richiesta HTTP
 | **Employee** | Gestione operativa: avanzamento stato noleggi (via business logic) |
 | **Customer** | Ricerca veicoli, prenotazione e gestione dei propri noleggi |
 
-Employee e Customer **non si distinguono a livello Spring Security** - entrambi sono `authenticated()`. La distinzione è nel service layer.
+Employee e Customer **non si distinguono a livello Spring Security**: entrambi sono `authenticated()`. La distinzione è nel service layer.
 
 ### 3.4 Matrice di Accesso RBAC
 
@@ -458,50 +417,47 @@ Definita in `SecurityConfig.java`. Le regole sono valutate **top-to-bottom**: la
 
 ---
 
-https://developer.mozilla.org/en-US/docs/Web/HTTP/Status).
+## 4. API Reference
+
+La documentazione completa degli endpoint è disponibile tramite Swagger UI all'endpoint `/swagger-ui/index.html` (richiede ruolo ADMIN). Le sezioni seguenti descrivono i controller principali esposti dall'applicazione.
 
 ---
 
-## 4. Containerizzazione
+## 5. Containerizzazione
 
-### 4.1 Dockerfile Backend ([`rentACar_backend/Dockerfile`](Dockerfile))
+### 5.1 Dockerfile Backend ([`rentACar_backend/Dockerfile`](Dockerfile))
 
-Il backend adotta un **multi-stage build** in due fasi distinte: una per la compilazione, una per l'esecuzione. L'immagine finale non contiene Maven, il JDK, i sorgenti né i file `.class` intermedi - solo il JAR eseguibile.
+Il build Docker del backend usa due fasi separate: nella prima fase si usa un'immagine Java completa (con Maven e JDK) per compilare il codice e produrre il JAR. Nella seconda fase si usa un'immagine più leggera (solo JRE, senza compilatore) e si copia soltanto il JAR compilato. L'immagine finale che va in produzione non contiene Maven, il compilatore Java, i sorgenti né i file intermedi di compilazione.
 
-**Scelte di sicurezza:**
+**Scelte rilevanti per sicurezza e funzionamento:**
 
-| Scelta | Motivazione |
-|--------|-------------|
-| Multi-stage build | Immagine finale senza Maven/JDK; superficie Trivy minimale |
-| `eclipse-temurin:17-jre` come base runtime | JRE senza compilatore; pacchetti OS ridotti |
-| `dependency:go-offline` come layer separato | Cache Docker riutilizzata finché `pom.xml` non cambia |
-| Utente `appuser` UID 10001 | Exploit app → nessun root sull'host |
-| `--chown` su COPY | Proprietà corretta senza chmod separato |
-| Health check via `/actuator/health` | Verifica reale HTTP, non solo TCP |
-| Forma array in ENTRYPOINT | Processo Java riceve `SIGTERM` direttamente (shutdown ordinato) |
+| Scelta | Perché |
+|--------|--------|
+| Multi-stage build | L'immagine finale è più piccola e ha meno componenti che Trivy potrebbe segnalare come vulnerabili |
+| `eclipse-temurin:17-jre` come base runtime | JRE è il solo ambiente di esecuzione Java, senza il compilatore. Meno pacchetti OS installati rispetto a un'immagine JDK |
+| Utente `appuser` UID 10001 | Il processo Java gira come utente non privilegiato. Se l'applicazione venisse compromessa, l'attaccante non avrebbe accesso root al server |
+| Forma array in `ENTRYPOINT` | Il processo Java riceve il segnale di spegnimento (`SIGTERM`) direttamente, permettendo uno spegnimento ordinato invece di essere terminato forzatamente |
 
 ---
 
-### 4.2 Dockerfile Frontend ([`rent-a-car-frontend-project/Dockerfile`](../rent-a-car-frontend-project/Dockerfile))
+### 5.2 Dockerfile Frontend ([`rent-a-car-frontend-project/Dockerfile`](../rent-a-car-frontend-project/Dockerfile))
 
-Anche il frontend adotta multi-stage: Node per la build React, nginx Alpine per il serving. L'immagine finale non contiene Node.js, npm né i sorgenti TypeScript.
+Anche il frontend usa due fasi: nella prima, Node.js compila il codice TypeScript/React in file statici HTML, CSS e JavaScript. Nella seconda, si usa un'immagine nginx minimale (circa 25 MB contro i 700 MB di Node) per servire quei file. L'immagine finale non contiene Node.js, npm né i sorgenti TypeScript.
 
-**Scelte di sicurezza:**
+**Scelte rilevanti:**
 
-| Scelta | Motivazione |
-|--------|-------------|
-| Multi-stage build | Immagine finale senza Node.js/npm/sorgenti TS |
-| `nginx:1.27-alpine` come base serving | Immagine minimale (~25 MB vs ~700 MB Node) |
-| `apk upgrade --no-cache` | Risolve CVE Alpine senza accumulare layer cache |
-| Configurazione nginx custom | SPA routing corretto; reverse proxy `/api/` |
-| `nginx` utente non-root (Alpine default) | Nessun privilegio root sul serving |
-| `daemon off` in CMD | nginx in foreground: Docker vede il processo principale attivo |
+| Scelta | Perché |
+|--------|--------|
+| `nginx:1.27-alpine` come base | Immagine ~25 MB; superficie d'attacco molto ridotta rispetto a Node |
+| `apk upgrade` nel Dockerfile | Aggiorna tutti i pacchetti Alpine all'ultima versione con fix disponibili al momento della build |
+| nginx utente non-root | Il processo nginx gira senza privilegi di amministratore |
+| Configurazione nginx custom | Necessaria per il routing React (ogni URL torna a `index.html`) e per il reverse proxy verso il backend (`/api/` → Spring Boot) |
 
 ---
 
-### 4.3 Docker Compose ([`rentACar_backend/docker-compose.yml`](docker-compose.yml))
+### 5.3 Docker Compose ([`rentACar_backend/docker-compose.yml`](docker-compose.yml))
 
-Il file orchestra tre servizi - `postgres`, `app` (backend), `frontend` - su una rete bridge privata. L'unica porta esposta all'host è la 8080 (nginx), tutto il resto comunica internamente.
+Il file avvia tre servizi in parallelo (`postgres`, `app` backend Spring Boot, `frontend` nginx) collegati tra loro su una rete interna Docker. Dall'esterno è raggiungibile solo la porta 8080 di nginx; il database e il backend non hanno porte esposte e non sono raggiungibili direttamente dall'esterno. I tre container si raggiungono tra loro usando i nomi come indirizzi (es. il backend si connette a `postgres:5432`).
 
 ```
 Host (porta 8080)
@@ -528,94 +484,96 @@ Host (porta 8080)
 
 ---
 
-## 5. Vulnerabilità Identificate tramite Fase di Testing
+## 6. Vulnerabilità Identificate tramite Fase di Testing
 
-L'analisi si è svolta in due round distinti di audit statico del codice sorgente, seguendo il framework OWASP Top 10 2021 e CWE come riferimento tecnico. Il primo round ha rilevato 14 vulnerabilità e un flaw architetturale critico (`anyRequest().permitAll()` come regola globale); il secondo round ha identificato 14 vulnerabilità aggiuntive più sottili nel frontend e nella logica di business. **Totale: 29 vulnerabilità - tutte risolte.**
+Nel corso del progetto sono state identificate e risolte 29 vulnerabilità, seguendo il framework OWASP Top 10 2021 e CWE come riferimento tecnico. Le vulnerabilità comprendono un flaw architetturale critico (`anyRequest().permitAll()` come regola di default), problemi sul backend (token management, CORS, rate limiting, upload file) e problemi sul frontend e nella logica di business (cookie, validazione pagamenti, lockout). **Tutte risolte.**
 
-### 5.1 Vulnerabilità Identificate
+### 6.1 Vulnerabilità Identificate
 
-| Round | ID | Titolo | Gravità | OWASP | CWE | Stato |
-|:-----:|----|--------|---------|-------|-----|:-----:|
-| 1 | S1-1 | Global `permitAll()` - nessun RBAC | Critica | A01 | 284, 862 | Risolto |
-| 1 | V01 | Password nei query parameter (`isUserTrue`, `updatePassword`) | Critica | A07 | 598 | Risolto |
-| 1 | V02 | Escalation ruolo via signup pubblico | Critica | A01 | 269 | Risolto |
-| 1 | V03 | Domini attaccanti esplicitamente in whitelist CORS | Alta | A05 | 942 | Risolto |
-| 1 | V04 | Credenziali hardcoded in `application.properties` | Alta | A02 | 798 | Risolto |
-| 1 | V05 | Refresh token loggato in chiaro | Alta | A09 | 532 | Risolto |
-| 1 | V06 | Nessun rate limiting su endpoint di autenticazione | Alta | A07 | 307 | Risolto |
-| 1 | V07 | Nessuna validazione tipo file negli upload | Alta | A03 | 434 | Risolto |
-| 1 | V08 | Exception handler espone `e.getMessage()` | Media | A05 | 209 | Risolto |
-| 1 | V09 | TTL identico per access e refresh token (24h entrambi) | Media | A07 | 613 | Risolto |
-| 1 | V10 | Nessuna revoca server-side del refresh token | Media | A07 | 613 | Risolto |
-| 1 | V11 | Password deboli per utenti di seed (`"pass"`, 4 caratteri) | Media | A07 | 521 | Risolto |
-| 1 | V12 | Configurazione CORS duplicata (due bean conflittuali) | Bassa | A05 | 16 | Risolto |
-| 1 | V13 | Swagger UI nella whitelist pubblica | Bassa | A05 | 16 | Risolto |
-| 1 | V14 | Header `Content-Security-Policy` mancante | Media | A05 | 693 | Risolto |
-| 2 | V-01 | Frontend chiama ancora `GET isUserTrue` con credenziali nei params | Alta | A02 | 598 | Risolto |
-| 2 | V-02 | Access token salvato in `localStorage` (leggibile da XSS) | Alta | A07 | 614 | Risolto |
-| 2 | V-03 | Rate limiter si fida di `X-Forwarded-For` (spoofable) | Alta | A07 | 307 | Risolto |
-| 2 | V-04 | Nessuna revoca token al logout (endpoint logout assente) | Alta | A07 | 613 | Risolto |
-| 2 | V-05 | JWT claims espongono PII (nome, cognome, telefono) | Media | A02 | 312 | Risolto |
-| 2 | V-06 | Validation errors espongono nomi dei campi DTO | Media | A05 | 209 | Risolto |
-| 2 | V-07 | `console.log(response)` nell'interceptor Axios | Media | A09 | 532 | Risolto |
-| 2 | V-08 | Password: solo lunghezza verificata, nessuna complessità | Media | A07 | 521 | Risolto |
-| 2 | V-09 | `RateLimitFilter` usa `ConcurrentHashMap` senza eviction (OOM) | Media | A05 | 770 | Risolto |
-| 2 | V-10 | `checkCreditCardNumber()` era uno stub vuoto - qualsiasi numero accettato | Media | A03 | 20 | Risolto |
-| 2 | V-11 | `checkCreditCardExpirationDate()` aveva logica invertita e non veniva chiamata | Media | A03 | 20 | Risolto |
-| 2 | V-12 | Numero di telefono: regex accettava `0000000000` | Bassa | A03 | 20 | Risolto |
-| 2 | V-13 | Swagger accessibile a qualsiasi utente autenticato (non solo ADMIN) | Bassa | A05 | 284 | Risolto |
-| 2 | V-14 | Nessun blocco account dopo N tentativi di login falliti | Bassa | A07 | 307 | Risolto |
+| ID | Titolo | Gravità | OWASP | CWE | Test di riferimento | Stato |
+|----|--------|---------|-------|-----|---------------------|:-----:|
+| S1-1 | Global `permitAll()` - nessun RBAC | Critica | A01 | 284, 862 | `SecurityFilterChainTest` | Risolto |
+| V01 | Password nei query parameter (`isUserTrue`, `updatePassword`) | Critica | A07 | 598 | `AuthenticationControllerSecurityTest` | Risolto |
+| V02 | Escalation ruolo via signup pubblico | Critica | A01 | 269 | `RoleEscalationSecurityTest` | Risolto |
+| V03 | Domini attaccanti esplicitamente in whitelist CORS | Alta | A05 | 942 | `CorsAttackerDomainSecurityTest` | Risolto |
+| V04 | Credenziali hardcoded in `application.properties` | Alta | A02 | 798 | `HardcodedCredentialsSecurityTest` | Risolto |
+| V05 | Refresh token loggato in chiaro | Alta | A09 | 532 | `RefreshTokenLoggingSecurityTest` | Risolto |
+| V06 | Nessun rate limiting su endpoint di autenticazione | Alta | A07 | 307 | `RateLimitingSecurityTest` | Risolto |
+| V07 | Nessuna validazione tipo file negli upload | Alta | A03 | 434 | `FileUploadSecurityTest`, `ImageMagicBytesSecurityTest` | Risolto |
+| V08 | Exception handler espone `e.getMessage()` | Media | A05 | 209 | `GenericExceptionHandlerSecurityTest` | Risolto |
+| V09 | TTL identico per access e refresh token (24h entrambi) | Media | A07 | 613 | `JwtTtlSecurityTest` | Risolto |
+| V10 | Nessuna revoca server-side del refresh token | Media | A07 | 613 | `RefreshTokenRevocationSecurityTest` | Risolto |
+| V11 | Password deboli per utenti di seed (`"pass"`, 4 caratteri) | Media | A07 | 521 | `PasswordComplexitySecurityTest` | Risolto |
+| V12 | Configurazione CORS duplicata (due bean conflittuali) | Bassa | A05 | 16 | `CorsConfigDuplicationSecurityTest` | Risolto |
+| V13 | Swagger UI nella whitelist pubblica | Bassa | A05 | 16 | `SwaggerAdminOnlySecurityTest` | Risolto |
+| V14 | Header `Content-Security-Policy` mancante | Media | A05 | 693 | `CorsSecurityTest` | Risolto |
+| V-01 | Frontend chiama ancora `GET isUserTrue` con credenziali nei params | Alta | A02 | 598 | `AuthenticationControllerSecurityTest` | Risolto |
+| V-02 | Access token salvato in `localStorage` (leggibile da XSS) | Alta | A07 | 614 | `HttpOnlyCookieSecurityTest` | Risolto |
+| V-03 | Rate limiter si fida di `X-Forwarded-For` (spoofable) | Alta | A07 | 307 | `RateLimitXForwardedForSecurityTest` | Risolto |
+| V-04 | Nessuna revoca token al logout (endpoint logout assente) | Alta | A07 | 613 | `LogoutSecurityTest` | Risolto |
+| V-05 | JWT claims espongono PII — dati personali identificabili (nome, cognome, telefono) | Media | A02 | 312 | `JwtClaimsPIISecurityTest` | Risolto |
+| V-06 | Validation errors espongono nomi dei campi DTO | Media | A05 | 209 | `ValidationErrorExposureSecurityTest` | Risolto |
+| V-07 | `console.log(response)` nell'interceptor Axios | Media | A09 | 532 | (frontend, nessun test backend) | Risolto |
+| V-08 | Password: solo lunghezza verificata, nessuna complessità | Media | A07 | 521 | `PasswordComplexitySecurityTest` | Risolto |
+| V-09 | `RateLimitFilter` usa `ConcurrentHashMap` senza eviction (OOM) | Media | A05 | 770 | `RateLimitingSecurityTest` | Risolto |
+| V-10 | `checkCreditCardNumber()` era uno stub vuoto - qualsiasi numero accettato | Media | A03 | 20 | `PaymentValidationSecurityTest` | Risolto |
+| V-11 | `checkCreditCardExpirationDate()` aveva logica invertita e non veniva chiamata | Media | A03 | 20 | `PaymentValidationSecurityTest` | Risolto |
+| V-12 | Numero di telefono: regex accettava `0000000000` | Bassa | A03 | 20 | `PasswordComplexitySecurityTest` | Risolto |
+| V-13 | Swagger accessibile a qualsiasi utente autenticato (non solo ADMIN) | Bassa | A05 | 284 | `SwaggerAdminOnlySecurityTest` | Risolto |
+| V-14 | Nessun blocco account dopo N tentativi di login falliti | Bassa | A07 | 307 | `AccountLockoutSecurityTest` | Risolto |
 
-### 5.2 Patch Applicate
+> I codici CWE (Common Weakness Enumeration) identificano univocamente il tipo di debolezza software indipendentemente dal linguaggio o sistema. I codici OWASP A01–A09 sono le categorie dell'OWASP Top 10 2021, l'elenco delle vulnerabilità web più comuni secondo l'Open Worldwide Application Security Project.
 
-| Round | ID | Patch |
-|:-----:|----|-------|
-| 1 | **S1-1** | `anyRequest().permitAll()` → policy deny-by-default con RBAC esplicito |
-| 1 | **V01** | `GET /isUserTrue?password=...` → `POST` con body JSON; stesso fix su `updatePassword` |
-| 1 | **V02** | `@AssertTrue isAuthorityCustomer()` in `SignUpRequest`: rifiuta `authority != CUSTOMER` |
-| 1 | **V03** | Rimossi `evil-attacker.com` e `attacker.example.com` da `CorsConfig.ALLOWED_ORIGINS` |
-| 1 | **V04** | `application.properties` in `.gitignore`; Docker usa Secrets (`/run/secrets/`) |
-| 1 | **V05** | Rimosso `refreshTokenRequest.getToken()` dal `log.info()` in `RefreshTokenController` |
-| 1 | **V06** | `RateLimitFilter` con Bucket4j: 10 req/min per IP, HTTP 429 + `Retry-After: 60` |
-| 1 | **V07** | Whitelist `Content-Type` in `CarImageServiceImpl` / `UserImageServiceImpl`: non-immagini → 415 |
-| 1 | **V08** | `e.getMessage()` → stringa generica statica; stack trace conservato solo nei log server-side |
-| 1 | **V09** | Access token: 1h; refresh token: 7 giorni via property separata `refresh-expiration` |
-| 1 | **V10** | Tabella `refresh_tokens` con SHA-256; rotazione obbligatoria; theft detection |
-| 1 | **V11** | Password seed `"pass"` → `"Seed@1234"`; `@Pattern` per complessità minima |
-| 1 | **V12** | Rimosso `addCorsMappings()` da `WebConfig`; unica fonte: `CorsConfig` |
-| 1 | **V13** | Swagger spostato da whitelist pubblica a `.hasRole("ADMIN")` |
-| 1 | **V14** | `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'` in `SecurityConfig` |
-| 2 | **V-01** | `signInService.ts`: da `axiosInstance.get()` con `{params}` a `axiosInstance.post()` con body |
-| 2 | **V-02** | `signIn()` imposta cookie `HttpOnly; Secure; SameSite=Strict`; rimosso `localStorage.setItem`; frontend usa `withCredentials: true` |
-| 2 | **V-03** | `RateLimitFilter.resolveClientIp()`: `X-Forwarded-For` trusted solo da IP proxy noti (loopback, RFC1918); IP pubblici → `getRemoteAddr()` diretto |
-| 2 | **V-04** | `POST /api/v1/auth/logout` aggiunto: chiama `revokeAllForUser()` e scade i cookie con `maxAge=0` |
-| 2 | **V-05** | `JwtService.generateToken()`: rimossi `firstname`, `lastname`, `phoneNumber` dal payload JWT |
-| 2 | **V-06** | `CustomExceptionHandler`: flag `app.expose-validation-details=false` in produzione → risposta contiene solo `"Validation error"` |
-| 2 | **V-07** | `axiosInterceptors.ts`: rimosso `console.log(response)` dall'interceptor |
-| 2 | **V-08** | `SignUpRequest.password`: `@Size(min=8)` → `@Pattern` (maiuscola + minuscola + cifra + speciale) |
-| 2 | **V-09** | `ConcurrentHashMap<String,Bucket>` → Caffeine `Cache` con `expireAfterAccess(2min)` e `maximumSize(50_000)` |
-| 2 | **V-10** | `PaymentRules.checkCreditCardNumber()`: implementato algoritmo Luhn |
-| 2 | **V-11** | `checkCreditCardExpirationDate()`: logica corretta (`isBefore` invece di `isAfter`) e agganciata a `checkCreditCard()` |
-| 2 | **V-12** | Regex phone: `^[0-9]+$` → `^[1-9][0-9]{9}$` |
-| 2 | **V-13** | Swagger paths: da `.authenticated()` a `.hasRole("ADMIN")` |
-| 2 | **V-14** | `AccountLockoutService`: blocco account dopo 5 tentativi falliti con reset automatico dopo timeout |
+### 6.2 Patch Applicate
+
+| ID | Patch |
+|----|-------|
+| **S1-1** | `anyRequest().permitAll()` → policy deny-by-default con RBAC esplicito |
+| **V01** | `GET /isUserTrue?password=...` → `POST` con body JSON; stesso fix su `updatePassword` |
+| **V02** | `@AssertTrue isAuthorityCustomer()` in `SignUpRequest`: rifiuta `authority != CUSTOMER` |
+| **V03** | Rimossi `evil-attacker.com` e `attacker.example.com` da `CorsConfig.ALLOWED_ORIGINS` |
+| **V04** | `application.properties` in `.gitignore`; Docker usa Secrets (`/run/secrets/`) |
+| **V05** | Rimosso `refreshTokenRequest.getToken()` dal `log.info()` in `RefreshTokenController` |
+| **V06** | `RateLimitFilter` con Bucket4j: 10 req/min per IP, HTTP 429 + `Retry-After: 60` |
+| **V07** | Whitelist `Content-Type` in `CarImageServiceImpl` / `UserImageServiceImpl`: non-immagini → 415 |
+| **V08** | `e.getMessage()` → stringa generica statica; stack trace conservato solo nei log server-side |
+| **V09** | Access token: 1h; refresh token: 7 giorni via property separata `refresh-expiration` |
+| **V10** | Tabella `refresh_tokens` con SHA-256; rotazione obbligatoria; theft detection |
+| **V11** | Password seed `"pass"` → `"Seed@1234"`; `@Pattern` per complessità minima |
+| **V12** | Rimosso `addCorsMappings()` da `WebConfig`; unica fonte: `CorsConfig` |
+| **V13** | Swagger spostato da whitelist pubblica a `.hasRole("ADMIN")` |
+| **V14** | `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'` in `SecurityConfig` |
+| **V-01** | `signInService.ts`: da `axiosInstance.get()` con `{params}` a `axiosInstance.post()` con body |
+| **V-02** | `signIn()` imposta cookie `HttpOnly; Secure; SameSite=Strict`; rimosso `localStorage.setItem`; frontend usa `withCredentials: true` |
+| **V-03** | `RateLimitFilter.resolveClientIp()`: `X-Forwarded-For` trusted solo da IP proxy noti (loopback, RFC1918); IP pubblici → `getRemoteAddr()` diretto |
+| **V-04** | `POST /api/v1/auth/logout` aggiunto: chiama `revokeAllForUser()` e scade i cookie con `maxAge=0` |
+| **V-05** | `JwtService.generateToken()`: rimossi `firstname`, `lastname`, `phoneNumber` dal payload JWT |
+| **V-06** | `CustomExceptionHandler`: flag `app.expose-validation-details=false` in produzione → risposta contiene solo `"Validation error"` |
+| **V-07** | `axiosInterceptors.ts`: rimosso `console.log(response)` dall'interceptor |
+| **V-08** | `SignUpRequest.password`: `@Size(min=8)` → `@Pattern` (maiuscola + minuscola + cifra + speciale) |
+| **V-09** | `ConcurrentHashMap<String,Bucket>` → Caffeine `Cache` con `expireAfterAccess(2min)` e `maximumSize(50_000)` |
+| **V-10** | `PaymentRules.checkCreditCardNumber()`: implementato algoritmo Luhn |
+| **V-11** | `checkCreditCardExpirationDate()`: logica corretta (`isBefore` invece di `isAfter`) e agganciata a `checkCreditCard()` |
+| **V-12** | Regex phone: `^[0-9]+$` → `^[1-9][0-9]{9}$` |
+| **V-13** | Swagger paths: da `.authenticated()` a `.hasRole("ADMIN")` |
+| **V-14** | `AccountLockoutService`: blocco account dopo 5 tentativi falliti con reset automatico dopo timeout |
 
 ---
-## 6. Strumenti di Sicurezza Automatici
+## 7. Strumenti di Sicurezza Automatici
 
 Il progetto integra cinque tool di analisi della sicurezza, ciascuno con uno scope diverso:
 
 | Tool | Tipo analisi | Quando gira | Scope |
 |------|-------------|-------------|-------|
 | **GitGuardian** | Secret scanning | Push/PR (CI) | Working tree corrente |
-| **Snyk** | SCA (dipendenze) | CI su ogni push | Librerie Maven (`pom.xml`) + Node (`package.json`) |
+| **Snyk** | SCA (dipendenze) | CI su ogni push | Librerie Maven (`pom.xml`) |
 | **Semgrep** | SAST (codice sorgente) | CI su ogni push | Codice Java sorgente |
 | **SonarCloud** | SAST + Quality Gate + Coverage | CI su ogni push | Java (backend) + TypeScript (frontend) |
-| **Trivy** | Container scanning | Deploy (solo tag `v*.*.*`) | Immagine Docker completa (OS + JRE + JAR) |
+| **Trivy** | Container scanning | Deploy (pubblicazione GitHub Release) | Immagine Docker completa (OS + JRE + JAR) |
 
 ---
 
-### 6.1 GitGuardian - Secret Detection
+### 7.1 GitGuardian - Secret Detection
 
 GitGuardian scansiona il repository alla ricerca di credenziali hardcoded (API key, token, password) nel codice corrente e nella storia dei commit. Nel workflow CI il job usa `ggshield` in modalità path scan: blocca solo se trova segreti nel codice del branch corrente.
 
@@ -635,42 +593,47 @@ GitGuardian scansiona il repository alla ricerca di credenziali hardcoded (API k
 
 ---
 
-### 6.2 Snyk - Software Composition Analysis (SCA)
+### 7.2 Snyk - Software Composition Analysis (SCA)
 
-Snyk analizza le dipendenze Maven del backend e le dipendenze Node del frontend, confrontandole con il database di CVE. Nel branch analizzato erano presenti **12 alert** (5 High, 4 Medium, 3 Low). Tutti risolti.
+Snyk analizza le dipendenze Maven del backend (`snyk test --maven-projects`), confrontandole con il database di CVE. Nel branch analizzato erano presenti **12 alert** (5 High, 4 Medium, 3 Low). Tutti risolti.
 
-**Analisi eseguita su:** branch `master-dev` - data: 2026-05-06 / aggiornamento: 2026-05-07
+**Analisi eseguita su:** branch `master-dev`, 2026-05-06, aggiornamento 2026-05-07.
 
-**Fix principale:** upgrade Spring Boot `3.5.13 → 3.5.14` - risolve 8 alert tramite aggiornamento transitivo di `spring-boot`, `spring-boot-autoconfigure`, `spring-web`, `spring-webmvc` alle versioni patchate.
+Il fix principale è stato l'upgrade di Spring Boot da `3.5.13` a `3.5.14`: questa versione aggiorna in modo transitivo `spring-boot`, `spring-boot-autoconfigure`, `spring-web` e `spring-webmvc` alle versioni con le patch applicate, risolvendo 8 degli alert in un colpo solo. Gli altri 4 alert hanno richiesto interventi specifici descritti nella tabella.
 
-| Alert | Pacchetto | Severità | CWE | Fix | Note |
-|-------|-----------|----------|-----|-----|------|
-| #68 | `springfox-swagger2` | Medium | CWE-20 | Dipendenza rimossa | Sostituita con springdoc |
-| #69 | `springfox-swagger-ui` | Medium | CWE-79 (XSS) | Dipendenza rimossa | Non mantenuta dal 2021 |
-| #70 | `postgresql` JDBC | High | CWE-770 | Pin `42.7.11` | Aggiunto `fetch_size=100` come defense-in-depth |
-| #71 | `spring-web` | High | CWE-459 | Spring Boot 3.5.14 | WebFlux non usato; impatto ridotto |
-| #72 | `spring-core` | Medium | CWE-770 | Spring Boot 3.5.14 + `JacksonConfig` | `StreamReadConstraints` aggiunto come defense-in-depth |
-| #73 | `spring-boot-devtools` | High | CWE-208 (Timing) | Dipendenza rimossa | DevTools non appartiene a produzione |
-| #74 | `spring-boot` | High | CWE-338 (Weak PRNG) | Spring Boot 3.5.14 | Il codice usava già `UUID.randomUUID()` (SecureRandom) |
-| #75 | `spring-boot` | High | CWE-377 (Insecure Temp) | Spring Boot 3.5.14 + tmpfs | `/tmp` montato `noexec,nosuid` in docker-compose |
-| #76 | `spring-boot` | Medium | CWE-61 (Symlink) | Spring Boot 3.5.14 + tmpfs | **Non sfruttabile**: nessun `ApplicationPidFileWriter` configurato |
-| #77 | `spring-webmvc` | Low | CWE-444 (HTTP Smuggling) | Spring Boot 3.5.14 | **Non sfruttabile**: resource chain non configurata nel progetto |
-| #78 | `spring-boot-autoconfigure` | Low | CWE-297 (Cert Mismatch) | Spring Boot 3.5.14 | **Non sfruttabile**: nessuna dipendenza Cassandra |
-| #79 | `spring-boot-autoconfigure` | Low | CWE-297 (Cert Mismatch) | Spring Boot 3.5.14 + `checkserveridentity=true` | Aggiunto SSL property SMTP come defense-in-depth |
+| Alert | Pacchetto | Severità | CWE | Fix applicato |
+|-------|-----------|----------|-----|---------------|
+| #68 | `springfox-swagger2` | Medium | CWE-20 | Dipendenza rimossa, sostituita con springdoc |
+| #69 | `springfox-swagger-ui` | Medium | CWE-79 (XSS) | Dipendenza rimossa (non mantenuta dal 2021) |
+| #70 | `postgresql` JDBC | High | CWE-770 | Pin versione `42.7.11` + aggiunto `fetch_size=100` come difesa aggiuntiva |
+| #71 | `spring-web` | High | CWE-459 | Upgrade Spring Boot 3.5.14 (WebFlux non usato nel progetto; impatto ridotto) |
+| #72 | `spring-core` | Medium | CWE-770 | Upgrade Spring Boot 3.5.14 + aggiunto `StreamReadConstraints` in `JacksonConfig` |
+| #73 | `spring-boot-devtools` | High | CWE-208 | Dipendenza rimossa (DevTools non appartiene a produzione) |
+| #74 | `spring-boot` | High | CWE-338 | Upgrade Spring Boot 3.5.14 (il codice già usava `UUID.randomUUID()` basato su SecureRandom) |
+| #75 | `spring-boot` | High | CWE-377 | Upgrade Spring Boot 3.5.14 + `/tmp` montato `noexec,nosuid` in docker-compose |
+| #76 | `spring-boot` | Medium | CWE-61 | Upgrade Spring Boot 3.5.14 — non sfruttabile: richiede `ApplicationPidFileWriter`, non configurato nel progetto |
+| #77 | `spring-webmvc` | Low | CWE-444 | Upgrade Spring Boot 3.5.14 — non sfruttabile: richiede resource chain caching abilitata, assente in `WebConfig.java` |
+| #78 | `spring-boot-autoconfigure` | Low | CWE-297 | Upgrade Spring Boot 3.5.14 — non sfruttabile: richiede `spring-boot-starter-data-cassandra`, non presente nel progetto |
+| #79 | `spring-boot-autoconfigure` | Low | CWE-297 | Upgrade Spring Boot 3.5.14 + aggiunto `checkserveridentity=true` per connessione SMTP |
 
-**Alert con impatto nullo (non FP ma non sfruttabili):**
+**Modifiche al `pom.xml` per risolvere gli alert:**
 
-- **#76 Symlink Attack:** richiede l'uso di `ApplicationPidFileWriter`. Questo progetto non configura nessun listener PID né in `application*.properties` né nel codice. Il fix tramite upgrade è applicato comunque perché porta il codice all'ultima versione sicura.
-- **#77 HTTP Request Smuggling:** richiede resource chain caching abilitata + encoded resource resolution configurata. `WebConfig.java` non chiama `configurer.resourceChain()`. Il progetto non soddisfa nessuna delle tre condizioni necessarie.
-- **#78 Cert Host Mismatch (Cassandra):** richiede `spring-boot-starter-data-cassandra` come dipendenza. Non presente nel `pom.xml`.
+| Proprietà | Versione | Motivo |
+|-----------|----------|--------|
+| `spring-boot-starter-parent` | 3.5.14 | Upgrade da 3.5.13: risolve gli alert #71–#79 per via transitiva |
+| `tomcat.version` | 10.1.55 | Versione superiore al default incluso in Spring Boot 3.5.14, contenente fix di sicurezza aggiuntivi per Tomcat 10.1.x |
+| `spring-security.version` | 6.5.10 | Versione superiore al default incluso in Spring Boot 3.5.14, contenente fix di sicurezza per Spring Security 6.x |
+| `postgresql.version` | 42.7.11 | Risolve alert #70 (CWE-770, Resource Allocation Without Limits) |
+| `logback.version` | 1.5.25 | Fix CVE Logback nella versione inclusa da Spring Boot |
+| `commons-lang3.version` | 3.18.0 | Allineamento all'ultima versione stabile disponibile |
 
 ---
 
-### 6.3 Semgrep - SAST Pattern-Based
+### 7.3 Semgrep - SAST Pattern-Based
 
 Semgrep ha rilevato **4 finding** (tutti nello stesso file di regola: `java.lang.security.audit.active-debug-code-printstacktrace`, CWE-209 / CWE-489). Nessun falso positivo.
 
-Il problema comune era l'uso di `e.printStackTrace()` al posto di un logger strutturato. `e.printStackTrace()` scrive l'intero stack trace su `System.err`, che in produzione viene catturato dal container Docker e finisce nei log del server. Uno stack trace espone nomi delle classi interne, numeri di riga, versioni delle librerie terze e sequenze di chiamate - informazioni che abbassano il costo di un attacco successivo.
+Il problema comune era l'uso di `e.printStackTrace()` al posto di un logger strutturato. `e.printStackTrace()` scrive l'intero stack trace su `System.err`, che in produzione viene catturato dal container Docker e finisce nei log del server. Uno stack trace espone nomi delle classi interne, numeri di riga, versioni delle librerie terze e sequenze di chiamate: tutte informazioni che abbassano il costo di un attacco successivo.
 
 | Finding | File | Criticità aggiuntiva | Fix applicato |
 |---------|------|---------------------|---------------|
@@ -699,7 +662,7 @@ Tutti e quattro i finding sono stati risolti. Nessun finding di Semgrep è stato
 
 ---
 
-### 6.4 SonarCloud - SAST + Quality Gate + Coverage
+### 7.4 SonarCloud - SAST + Quality Gate + Coverage
 
 SonarCloud analizza il codice sorgente con analisi statica dataflow, calcola la copertura del codice tramite i report JaCoCo prodotti nel job `security-tests`, e applica un quality gate prima del merge. Due istanze separate: una per il backend Java, una per il frontend TypeScript.
 
@@ -715,13 +678,13 @@ Non vengono riportati finding specifici di SonarCloud perché i finding di anali
 
 ---
 
-### 6.5 Trivy - Container Security Scanning
+### 7.5 Trivy - Container Security Scanning
 
 Trivy scansiona l'immagine Docker del backend alla ricerca di CVE nei pacchetti OS (Debian/Alpine) e nelle dipendenze applicative. Il job `publish` in `deploy.yml` esegue tre step sequenziali:
 
-1. **SARIF completo** - scansiona tutte le severità (`exit-code: 0`), carica su GitHub → Security → Code scanning (visibile anche su finding LOW)
-2. **Upload SARIF** - `github/codeql-action/upload-sarif` rende i risultati navigabili nella Security tab
-3. **Gate CRITICAL/HIGH** - scansione con `exit-code: 1`, `ignore-unfixed: true`, `severity: CRITICAL,HIGH` - blocca il deploy se trova CVE gravi con fix disponibile
+1. **SARIF completo**: scansiona tutte le severità (`exit-code: 0`) e carica i risultati su GitHub → Security → Code scanning. SARIF (Static Analysis Results Interchange Format) è il formato JSON standard usato dagli strumenti di analisi statica per riportare i finding; GitHub lo importa nel tab Security.
+2. **Upload SARIF**: `github/codeql-action/upload-sarif` rende i risultati navigabili nella Security tab.
+3. **Gate CRITICAL/HIGH**: scansione con `exit-code: 1`, `ignore-unfixed: true`, `severity: CRITICAL,HIGH`; blocca il deploy se trova CVE gravi con fix disponibile.
 
 Il flag `--ignore-unfixed` è una scelta deliberata: CVE senza fix upstream non possono essere risolti aggiornando le dipendenze, quindi bloccare il deploy su di essi sarebbe un gate permanentemente rosso indipendentemente dalle azioni del team.
 
@@ -735,22 +698,22 @@ Nel corso del progetto sono state rilevate CVE in `stdlib@1.26.2` e `golang.org/
 
 **Perché Ubuntu 26.04 e non 24.04:**
 
-`eclipse-temurin:17-jre` usa Ubuntu 26.04 come base OS - non è una scelta del progetto, è la scelta di Eclipse Temurin. Ubuntu 26.04 include pacchetti di sistema più recenti rispetto a 24.04, alcuni dei quali (tool di sistema moderni) sono scritti in Go e distribuiti come binari precompilati dentro pacchetti `.deb`. Quando quei pacchetti vengono installati nell'immagine, il binario Go compilato finisce nell'immagine stessa. Trivy legge la versione Go con cui quel binario è stato compilato (`1.26.2`) e segnala le CVE note per quella versione. Il progetto non controlla né la scelta di Ubuntu 26.04 né la versione Go usata per compilare quei binari - entrambe dipendono da Eclipse Temurin e da Canonical.
+`eclipse-temurin:17-jre` usa Ubuntu 26.04 come base OS; non è una scelta del progetto, ma di Eclipse Temurin. Ubuntu 26.04 include pacchetti di sistema più recenti rispetto a 24.04, alcuni dei quali (tool di sistema moderni) sono scritti in Go e distribuiti come binari precompilati dentro pacchetti `.deb`. Quando quei pacchetti vengono installati nell'immagine, il binario Go compilato finisce nell'immagine stessa. Trivy legge la versione Go con cui quel binario è stato compilato (`1.26.2`) e segnala le CVE note per quella versione. Sia la scelta di Ubuntu 26.04 che la versione Go usata per compilare quei binari dipendono da Eclipse Temurin e da Canonical, non dal progetto.
 
 L'approccio VEX (Vulnerability Exploitability eXchange) per sopprimere queste CVE è stato valutato e scartato per tre motivi:
-- **PURL instabile:** ogni build produce un nuovo digest dell'immagine - nessun PURL stabile da inserire nel documento VEX
+- **PURL instabile:** ogni build produce un nuovo digest dell'immagine, senza un PURL stabile da inserire nel documento VEX
 - **Soppressione troppo ampia:** referenziare `stdlib` o `net` come prodotto sopprimerebbe quelle versioni ovunque nell'immagine, non solo dentro `pebble`
 - **Manutenzione insostenibile:** ogni aggiornamento della base image richiederebbe aggiornamento manuale del VEX
 
-**Soluzione adottata:** `--ignore-unfixed` nel gate (CVE in `pebble` non hanno fix disponibile nell'immagine base) - semanticamente corretto perché il problema è nella base, la soppressione è sulla base. Quando `eclipse-temurin:17-jre` aggiornerà `pebble` con versioni Go patchate, le CVE spariranno automaticamente dal report.
+**Soluzione adottata:** `--ignore-unfixed` nel gate. Le CVE in `pebble` non hanno fix disponibile nell'immagine base, quindi il flag le esclude in modo semanticamente corretto. Quando `eclipse-temurin:17-jre` aggiornerà `pebble` con versioni Go patchate, le CVE spariranno automaticamente dal report.
 
 ---
 
-## 7. Test di Sicurezza
+## 8. Test di Sicurezza
 
-La strategia di testing adottata è **incentrata sulla sicurezza**, non sulla correttezza funzionale: il 95% della suite (403 test su 424) verifica il comportamento del sistema in scenari di attacco o accesso non autorizzato, seguendo la tassonomia **OWASP Top 10 2021**. La suite è completamente indipendente dall'ambiente di produzione - usa H2 in-memory per il web layer, non effettua chiamate a Cloudinary o SMTP, e il rate limiting è disabilitabile via `app.rate-limit.enabled=false` nel profilo `test` - garantendo che ogni test sia riproducibile senza configurazione esterna.
+La strategia di testing adottata è **incentrata sulla sicurezza**, non sulla correttezza funzionale: il 95% della suite (403 test su 424) verifica il comportamento del sistema in scenari di attacco o accesso non autorizzato, seguendo la tassonomia **OWASP Top 10 2021**. La suite è completamente indipendente dall'ambiente di produzione: usa H2 in-memory per il web layer, non effettua chiamate a Cloudinary o SMTP, e il rate limiting è disabilitabile via `app.rate-limit.enabled=false` nel profilo `test`. Ogni test è quindi riproducibile senza configurazione esterna.
 
-I test sono organizzati in **43 classi** nel package `com.extendrent.security`, strutturate per area OWASP. I 403 test di sicurezza includono 355 metodi `@Test` e 13 metodi `@ParameterizedTest` che generano **48 istanze** aggiuntive - un'unica definizione di test esegue automaticamente l'intera lista di payload malevoli (SQL injection, XSS, path traversal, password deboli, numeri di carta non validi). Ai test di sicurezza si aggiungono 21 test funzionali su controller specifici (`DiscountControllerTest`, `PaymentDetailControllerTest`, `PaymentTypeControllerTest`, `RentalControllerTest`, `ApplicationTests`), per un totale di **424 test**.
+I test sono organizzati in **43 classi** nel package `com.extendrent.security`, strutturate per area OWASP. I 403 test di sicurezza includono 355 metodi `@Test` e 13 metodi `@ParameterizedTest` che generano **48 istanze** aggiuntive: un'unica definizione di test esegue automaticamente l'intera lista di payload malevoli (SQL injection, XSS, path traversal, password deboli, numeri di carta non validi). Ai test di sicurezza si aggiungono 21 test funzionali su controller specifici (`DiscountControllerTest`, `PaymentDetailControllerTest`, `PaymentTypeControllerTest`, `RentalControllerTest`, `ApplicationTests`), per un totale di **424 test**.
 
 Distribuzione per area OWASP:
 
@@ -779,13 +742,13 @@ mvn test -Dtest="com/extendrent/security/**"
 mvn verify
 ```
 
-In CI i job `security-tests` e `test` girano **in parallelo** su GitHub Actions dopo il gate `compile`.
+In CI i job `security-tests`, `snyk` e `semgrep` girano **in parallelo** su GitHub Actions dopo il gate `compile`.
 
 ---
 
 ### 8.1 Broken Access Control (RBAC) - A01
 
-Broken Access Control è la vulnerabilità al primo posto nell'OWASP Top 10 2021. In ExtendRent il rischio è duplice: endpoint che rispondono a ruoli non autorizzati (escalation verticale) e utenti che accedono a risorse altrui (IDOR, autorizzazione orizzontale). Tutta la filter chain di Spring Security - configurata in `SecurityConfig` con policy deny-by-default - viene verificata endpoint per endpoint, ruolo per ruolo, con MockMvc che simula richieste autenticate tramite `SecurityMockMvcRequestPostProcessors.jwt()`. Ogni controller ha una classe di test dedicata che copre sistematicamente tutti i metodi HTTP esposti.
+Broken Access Control è la vulnerabilità al primo posto nell'OWASP Top 10 2021. In ExtendRent il rischio è duplice: endpoint che rispondono a ruoli non autorizzati (escalation verticale) e utenti che accedono a risorse altrui (IDOR — Insecure Direct Object Reference: un utente modifica l'ID nella richiesta per accedere a dati di un altro utente, senza che il backend verifichi l'appartenenza). Tutta la filter chain di Spring Security — configurata in `SecurityConfig` con policy deny-by-default (qualsiasi endpoint non esplicitamente aperto è bloccato per default) — viene verificata endpoint per endpoint, ruolo per ruolo, con MockMvc (il framework di test Spring che simula richieste HTTP complete senza avviare un server reale, tramite `SecurityMockMvcRequestPostProcessors.jwt()` per le richieste autenticate). Ogni controller ha una classe di test dedicata che copre sistematicamente tutti i metodi HTTP esposti.
 
 [**`SecurityFilterChainTest`**](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/src/test/java/com/extendrent/security/SecurityFilterChainTest.java)
 
@@ -799,7 +762,7 @@ Usa MockMvc per colpire ogni endpoint del sistema con ciascun ruolo (Admin, Empl
 
 > `POST /auth/register`
 
-Il test invia una richiesta di registrazione con il campo `authority: ADMIN` nel body - un valore che un utente può inserire manualmente modificando la richiesta. Il ruolo viene determinato lato server, indipendentemente da ciò che il client invia.
+Il test invia una richiesta di registrazione con il campo `authority: ADMIN` nel body, un valore che un utente può inserire manualmente modificando la richiesta. Il ruolo viene determinato lato server, indipendentemente da ciò che il client invia.
 
 | Scenario | Comportamento |
 |----------|--------------|
@@ -825,7 +788,7 @@ Verifica che tutti gli endpoint degli amministratori e dei dipendenti siano acce
 
 > Endpoint noleggi
 
-Tutti gli endpoint CRUD del ciclo noleggio sono riservati ad Admin. Customer ed Employee non possono accedere né in lettura né in scrittura - il noleggio è gestito solo lato backoffice.
+Tutti gli endpoint CRUD del ciclo noleggio sono riservati ad Admin. Customer ed Employee non possono accedere né in lettura né in scrittura; il noleggio è gestito solo lato backoffice.
 
 | Unauthenticated | Customer | Employee | Admin |
 |:-:|:-:|:-:|:-:|
@@ -837,7 +800,7 @@ Tutti gli endpoint CRUD del ciclo noleggio sono riservati ad Admin. Customer ed 
 
 > `PUT /api/v1/user/{id}/password`
 
-Verifica la protezione contro IDOR (Insecure Direct Object Reference): ogni utente può modificare solo la propria password. Il controllo confronta l'ID nel path parameter con quello estratto dal JWT nel `SecurityContext` - se non coincidono, la richiesta viene rifiutata con 403.
+Verifica la protezione contro IDOR (Insecure Direct Object Reference): ogni utente può modificare solo la propria password. Il controllo confronta l'ID nel path parameter con quello estratto dal JWT nel `SecurityContext`; se non coincidono, la richiesta viene rifiutata con 403.
 
 | Scenario | Comportamento |
 |----------|--------------|
@@ -862,7 +825,7 @@ La gestione dei token è il cuore dell'autenticazione di ExtendRent. Dopo la rim
 
 [**`JwtServiceTest`**](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/src/test/java/com/extendrent/security/JwtServiceTest.java)
 
-Testa il servizio JWT in isolamento (senza Spring context): generazione con HMAC-SHA256, parsing e validazione standard, e resistenza a due attacchi noti. L'attacco `alg:none` bypassa la firma impostando l'header JWT a `"none"` - il sistema deve rifiutarlo. Il key confusion attack usa la chiave pubblica come segreto HMAC per ingannare il server che si aspetta HMAC-SHA256.
+Testa il servizio JWT in isolamento (senza Spring context): generazione con HMAC-SHA256, parsing e validazione standard, e resistenza a due attacchi noti. L'attacco `alg:none` bypassa la firma impostando l'header JWT a `"none"`; il sistema deve rifiutarlo. Il key confusion attack usa la chiave pubblica come segreto HMAC per ingannare il server che si aspetta HMAC-SHA256.
 
 | Scenario | Comportamento |
 |----------|--------------|
@@ -893,7 +856,7 @@ TTL separati per i due tipi di token: il token di accesso ha una finestra breve 
 
 > Payload JWT
 
-Decodifica il payload JWT emesso al login e verifica che non contenga dati personali sensibili. I claim PII erano stati aggiunti originariamente per evitare query aggiuntive al database; rimossi perché il JWT viaggia nel cookie e può essere intercettato o loggato - i dati personali non devono essere leggibili al di fuori del database.
+Decodifica il payload JWT emesso al login e verifica che non contenga dati personali sensibili. I claim PII erano stati aggiunti originariamente per evitare query aggiuntive al database; rimossi perché il JWT viaggia nel cookie e può essere intercettato o loggato, e i dati personali non devono essere leggibili al di fuori del database.
 
 | Claim | Status |
 |-------|--------|
@@ -908,7 +871,7 @@ Decodifica il payload JWT emesso al login e verifica che non contenga dati perso
 
 > `POST /api/v1/auth/logout`
 
-Simula un flusso di logout completo: autentica un utente, usa il token per una richiesta protetta (atteso 200), chiama `/auth/logout`, poi ritenta la stessa richiesta con il token appena revocato - deve rispondere 401.
+Simula un flusso di logout completo: autentica un utente, usa il token per una richiesta protetta (atteso 200), chiama `/auth/logout`, poi ritenta la stessa richiesta con il token appena revocato, che deve rispondere 401.
 
 | Scenario | Comportamento |
 |----------|--------------|
@@ -923,13 +886,13 @@ Simula un flusso di logout completo: autentica un utente, usa il token per una r
 
 > `POST /api/v1/auth/logout`
 
-Verifica che al logout il refresh token venga effettivamente invalidato nella tabella `refresh_tokens` (hashing SHA-256) e che un successivo tentativo di rinnovo con lo stesso token venga rifiutato. La rotazione obbligatoria e la theft detection (V10) fanno sì che ogni token sia usabile una sola volta - il riuso rivela un possibile furto.
+Verifica che al logout il refresh token venga effettivamente invalidato nella tabella `refresh_tokens` (hashing SHA-256) e che un successivo tentativo di rinnovo con lo stesso token venga rifiutato. La rotazione obbligatoria e la theft detection (V10) fanno sì che ogni token sia usabile una sola volta; il riuso rivela un possibile furto.
 
 ---
 
 [**`RefreshTokenLoggingSecurityTest`**](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/src/test/java/com/extendrent/security/RefreshTokenLoggingSecurityTest.java)
 
-Verifica che il valore del refresh token non appaia mai in nessuna riga di log. Prima della patch V05, `RefreshTokenController` stampava `log.info("...", refreshTokenRequest.getToken())` - il token avrebbe potuto finire nei log aggregati accessibili a operatori. Il test controlla che nessun pattern riconducibile al token sia presente nell'output del logger.
+Verifica che il valore del refresh token non appaia mai in nessuna riga di log. Prima della patch V05, `RefreshTokenController` stampava `log.info("...", refreshTokenRequest.getToken())`; il token avrebbe potuto finire nei log aggregati accessibili a operatori. Il test controlla che nessun pattern riconducibile al token sia presente nell'output del logger.
 
 **Outcome:** CWE-532 - il refresh token non appare mai nei log.
 
@@ -961,13 +924,13 @@ Verifica che il valore del refresh token non appaia mai in nessuna riga di log. 
 
 ### 8.3 Authentication & Rate Limiting - A07
 
-Il rate limiting è la prima linea di difesa contro gli attacchi brute-force sugli endpoint di autenticazione. Senza un limite, un attaccante può tentare migliaia di combinazioni al secondo fino a compromettere un account. ExtendRent implementa un token-bucket per IP con Caffeine come backing cache, affiancato da un lockout esplicito dopo cinque tentativi falliti consecutivi. I test verificano entrambi i meccanismi - in isolamento e in integrazione con il filtro HTTP - e la corretta risoluzione dell'IP client dietro reverse proxy, impedendo che l'header `X-Forwarded-For` venga falsificato per aggirare il rate limiter.
+Il rate limiting è la prima linea di difesa contro gli attacchi brute-force sugli endpoint di autenticazione. Senza un limite, un attaccante può tentare migliaia di combinazioni al secondo fino a compromettere un account. ExtendRent implementa un token-bucket per IP con Caffeine come backing cache, affiancato da un lockout esplicito dopo cinque tentativi falliti consecutivi. I test verificano entrambi i meccanismi, in isolamento e in integrazione con il filtro HTTP, e la corretta risoluzione dell'IP client dietro reverse proxy, impedendo che l'header `X-Forwarded-For` venga falsificato per aggirare il rate limiter.
 
 [**`RateLimitingSecurityTest`**](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/src/test/java/com/extendrent/security/RateLimitingSecurityTest.java) · [**`RateLimitingBehaviorTest`**](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/src/test/java/com/extendrent/security/RateLimitingBehaviorTest.java)
 
 > `POST /auth/**`
 
-Il test simula un attacco brute-force: invia 10 richieste in rapida successione verificando che tutte abbiano successo, poi invia l'undicesima - che deve ricevere 429 con `Retry-After: 60`. `RateLimitingBehaviorTest` verifica la logica del token-bucket in isolamento; `RateLimitingSecurityTest` la integrazione con il filtro HTTP.
+Il test simula un attacco brute-force: invia 10 richieste in rapida successione verificando che tutte abbiano successo, poi invia l'undicesima, che deve ricevere 429 con `Retry-After: 60`. `RateLimitingBehaviorTest` verifica la logica del token-bucket in isolamento; `RateLimitingSecurityTest` la integrazione con il filtro HTTP.
 
 | Scenario | Comportamento |
 |----------|--------------|
@@ -982,7 +945,7 @@ Il test simula un attacco brute-force: invia 10 richieste in rapida successione 
 
 > Header `X-Forwarded-For`
 
-Verifica che il rate limiter identifichi correttamente l'IP del client anche dietro un reverse proxy. Se la richiesta arriva da un IP noto (loopback o RFC1918), il rate limiter legge l'IP reale da `X-Forwarded-For`; altrimenti usa `getRemoteAddr()` - impedendo a un client diretto di falsificare l'header per aggirare il rate limiting.
+Verifica che il rate limiter identifichi correttamente l'IP del client anche dietro un reverse proxy. Se la richiesta arriva da un IP noto (loopback o RFC1918), il rate limiter legge l'IP reale da `X-Forwarded-For`; altrimenti usa `getRemoteAddr()`, impedendo a un client diretto di falsificare l'header per aggirare il rate limiting.
 
 | Scenario | Comportamento |
 |----------|--------------|
@@ -1014,7 +977,7 @@ Copre scenari trasversali al controller di autenticazione: verifica che la passw
 
 > `POST /auth/signin`
 
-Il test registra un utente, simula cinque tentativi di login con password errata e verifica che il sesto - anche con la password corretta - sia rifiutato. Verifica inoltre che il lockout abbia una scadenza temporale e che l'account si sblocchi automaticamente dopo il TTL configurato in `AccountLockoutService`.
+Il test registra un utente, simula cinque tentativi di login con password errata e verifica che il sesto, anche con la password corretta, sia rifiutato. Verifica inoltre che il lockout abbia una scadenza temporale e che l'account si sblocchi automaticamente dopo il TTL configurato in `AccountLockoutService`.
 
 | Scenario | Comportamento |
 |----------|--------------|
@@ -1042,7 +1005,7 @@ Le misconfigurazioni di sicurezza non derivano da errori logici nel codice, ma d
 
 [**`CorsSecurityTest`**](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/src/test/java/com/extendrent/security/CorsSecurityTest.java) · [**`CorsAttackerDomainSecurityTest`**](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/src/test/java/com/extendrent/security/CorsAttackerDomainSecurityTest.java)
 
-`CorsSecurityTest` invia richieste preflight dalle origini whitelistate e verifica che `Access-Control-Allow-Origin` sia presente. `CorsAttackerDomainSecurityTest` usa `evil-attacker.com` e `attacker.example.com` - domini inclusi per errore nella configurazione originale - e verifica che vengano rifiutati con header CORS assente.
+`CorsSecurityTest` invia richieste preflight dalle origini whitelistate e verifica che `Access-Control-Allow-Origin` sia presente. `CorsAttackerDomainSecurityTest` usa `evil-attacker.com` e `attacker.example.com` (domini inclusi per errore nella configurazione originale) e verifica che vengano rifiutati con header CORS assente.
 
 | Origine | Comportamento |
 |---------|--------------|
@@ -1053,7 +1016,7 @@ Le misconfigurazioni di sicurezza non derivano da errori logici nel codice, ma d
 
 [**`CorsConfigDuplicationSecurityTest`**](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/src/test/java/com/extendrent/security/CorsConfigDuplicationSecurityTest.java)
 
-Prima della patch V12, `WebConfig.addCorsMappings()` e `CorsConfig` coesistevano come due bean CORS distinti con regole potenzialmente conflittuali. Il test verifica che il bean `CorsFilter` sia registrato una sola volta e che non esista alcun `WebMvcConfigurer` che configuri regole CORS parallele - due sorgenti CORS portano a comportamenti imprevedibili a seconda dell'ordine di applicazione dei filtri.
+Prima della patch V12, `WebConfig.addCorsMappings()` e `CorsConfig` coesistevano come due bean CORS distinti con regole potenzialmente conflittuali. Il test verifica che il bean `CorsFilter` sia registrato una sola volta e che non esista alcun `WebMvcConfigurer` che configuri regole CORS parallele; due sorgenti CORS portano a comportamenti imprevedibili a seconda dell'ordine di applicazione dei filtri.
 
 ---
 
@@ -1073,7 +1036,7 @@ Classe inner di `CorsSecurityTest`. Verifica che ogni risposta HTTP contenga gli
 
 > `/v3/api-docs` · `/swagger-ui/**`
 
-Prima della patch, Swagger era accessibile a qualsiasi utente autenticato - un Customer poteva esplorare l'intera API, incluse le route Admin. La patch V13 ha ristretto l'accesso al solo ruolo `ADMIN`. Il test colpisce entrambi gli endpoint con tutti e quattro i livelli di accesso.
+Prima della patch, Swagger era accessibile a qualsiasi utente autenticato: un Customer poteva esplorare l'intera API, incluse le route Admin. La patch V13 ha ristretto l'accesso al solo ruolo `ADMIN`. Il test colpisce entrambi gli endpoint con tutti e quattro i livelli di accesso.
 
 | Unauthenticated | Customer | Employee | Admin |
 |:-:|:-:|:-:|:-:|
@@ -1091,7 +1054,7 @@ Con il profilo Spring `prod` attivo, verifica che `/swagger-ui/**` e `/v3/api-do
 
 [**`GenericExceptionHandlerSecurityTest`**](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/src/test/java/com/extendrent/security/GenericExceptionHandlerSecurityTest.java)
 
-Provoca intenzionalmente un errore interno (input malformato che raggiunge il servizio) e verifica che la risposta HTTP non contenga stack trace, nomi di classi interne, numeri di riga o l'output di `e.getMessage()`. Prima della patch, il `CustomExceptionHandler` restituiva il messaggio raw dell'eccezione - informazioni preziose per un attaccante nel pianificare exploit successivi.
+Provoca intenzionalmente un errore interno (input malformato che raggiunge il servizio) e verifica che la risposta HTTP non contenga stack trace, nomi di classi interne, numeri di riga o l'output di `e.getMessage()`. Prima della patch, il `CustomExceptionHandler` restituiva il messaggio raw dell'eccezione, informazioni preziose per un attaccante nel pianificare exploit successivi.
 
 **Outcome:** V-08 - HTTP 500 non espone stack trace né dettagli interni; `e.getMessage()` sostituito con stringa generica statica.
 
@@ -1107,7 +1070,7 @@ Con profilo `prod` e flag `app.expose-validation-details=false`, verifica che gl
 
 [**`HttpOnlyCookieSecurityTest`**](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/src/test/java/com/extendrent/security/HttpOnlyCookieSecurityTest.java)
 
-Verifica i flag del cookie di sessione impostato da `signIn()`: `HttpOnly` impedisce l'accesso da JavaScript (XSS non può estrarre il token), `Secure` limita la trasmissione a HTTPS, `SameSite=Strict` blocca le richieste cross-origin automatiche (CSRF). Prima della patch V-02, il token era salvato in `localStorage` - accessibile a qualsiasi script in pagina.
+Verifica i flag del cookie di sessione impostato da `signIn()`: `HttpOnly` impedisce l'accesso da JavaScript (XSS non può estrarre il token), `Secure` limita la trasmissione a HTTPS, `SameSite=Strict` blocca le richieste cross-origin automatiche (CSRF). Prima della patch V-02, il token era salvato in `localStorage`, accessibile a qualsiasi script in pagina.
 
 **Outcome:** V-02 - cookie `HttpOnly; Secure; SameSite=Strict`; rimosso `localStorage.setItem` dal frontend.
 
@@ -1161,7 +1124,7 @@ Verifica la regex di complessità applicata al campo `password` durante la regis
 
 > Endpoint upload immagini
 
-Invia file con `Content-Type` non in whitelist (PDF, testo, binario generico) all'endpoint di upload immagini e verifica che la risposta sia 415 Unsupported Media Type. Prima della patch V07, qualsiasi file veniva accettato e caricato su Cloudinary - un attaccante avrebbe potuto caricare script, eseguibili o file di configurazione.
+Invia file con `Content-Type` non in whitelist (PDF, testo, binario generico) all'endpoint di upload immagini e verifica che la risposta sia 415 Unsupported Media Type. Prima della patch V07, qualsiasi file veniva accettato e caricato su Cloudinary; un attaccante avrebbe potuto caricare script, eseguibili o file di configurazione.
 
 **Outcome:** V-07/CWE-434 - whitelist `Content-Type` in `CarImageServiceImpl` / `UserImageServiceImpl`; file non-immagine → 415.
 
@@ -1171,7 +1134,7 @@ Invia file con `Content-Type` non in whitelist (PDF, testo, binario generico) al
 
 > Endpoint pagamento
 
-Verifica l'algoritmo di Luhn implementato in `PaymentRules`. Quattro numeri di carta con checksum Luhn corretto devono superare la validazione; quattro con checksum errato devono essere rifiutati. Prima della patch, qualsiasi stringa numerica veniva accettata come numero di carta valido - mancava qualsiasi controllo sul formato.
+Verifica l'algoritmo di Luhn implementato in `PaymentRules`. Quattro numeri di carta con checksum Luhn corretto devono superare la validazione; quattro con checksum errato devono essere rifiutati. Prima della patch, qualsiasi stringa numerica veniva accettata come numero di carta valido; mancava qualsiasi controllo sul formato.
 
 | Input testati | Istanze | Comportamento |
 |---------------|:-------:|--------------|
@@ -1200,6 +1163,8 @@ Le credenziali hardcodate nel codice sorgente sopravvivono nella storia git anch
 
 Scansiona il classpath compilato cercando pattern riconducibili a credenziali hardcoded: chiavi JWT, password, API key Cloudinary, credenziali SMTP. Il test fallisce se trova qualsiasi stringa che corrisponde ai pattern noti (Base64 di lunghezza JWT, pattern SMTP, ecc.) nei file `.class` o `.properties` inclusi nel JAR. Prima della patch, `application.properties` era committato con credenziali reali.
 
+**Nota CI:** il test usa `Assumptions.assumeTrue(Files.exists(PROPS_PATH))` — se `application.properties` non è presente (come accade in CI, dove il file è in `.gitignore`), il test viene **saltato automaticamente** invece di fallire. Questo è il comportamento corretto: in locale il test verifica l'assenza di credenziali nel file; in CI il file non esiste e non c'è nulla da verificare.
+
 **Outcome:** CWE-798 - nessuna credenziale hardcodata nel sorgente corrente; `application.properties` in `.gitignore`; Docker usa Secrets (`/run/secrets/`).
 
 ---
@@ -1212,7 +1177,7 @@ I sistemi di log aggregato (ELK, CloudWatch, Loki) sono spesso accessibili a un 
 
 [**`RefreshTokenLoggingSecurityTest`**](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/src/test/java/com/extendrent/security/RefreshTokenLoggingSecurityTest.java)
 
-Cattura l'output del logger durante un ciclo di refresh e verifica che nessuna riga contenga pattern riconducibili al token - né il valore raw né una sua sottostringa. Prima della patch, `RefreshTokenController` stampava `log.info("...", refreshTokenRequest.getToken())`: il token avrebbe potuto finire nei log aggregati accessibili agli operatori.
+Cattura l'output del logger durante un ciclo di refresh e verifica che nessuna riga contenga pattern riconducibili al token, né il valore raw né una sua sottostringa. Prima della patch, `RefreshTokenController` stampava `log.info("...", refreshTokenRequest.getToken())`: il token avrebbe potuto finire nei log aggregati accessibili agli operatori.
 
 **Outcome:** CWE-532 - il refresh token non appare mai nei log.
 
@@ -1237,98 +1202,179 @@ Verifica che al logout il refresh token venga invalidato nella tabella `refresh_
 
 ---
 
-## 8. Pipeline CI/CD
+## 9. Pipeline CI/CD
 
-La pipeline è strutturata su due livelli distinti: un livello root che governa la parte di backend + frontend e un livello dedicato al solo backend con una pipeline più granulare. I due livelli sono indipendenti e si attivano su branch diversi, ma condividono gli stessi strumenti di sicurezza.
+Il progetto usa due workflow GitHub Actions separati per responsabilità distinte: `ci.yml` per la continuous integration su ogni push, `deploy.yml` per il rilascio su Docker Hub al momento della pubblicazione di una release GitHub.
 
-### 8.1 Livello Root ([`.github/workflows/`](https://github.com/aaselli2-unisa/rentACar_backend/tree/master/.github/workflows))
+### 9.1 Workflow CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml))
 
-Il livello root si attiva su push e PR verso `main`/`develop` e copre contemporaneamente backend e frontend. È composto da due workflow separati con responsabilità distinte.
-
-**[`ci.yml`](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/.github/workflows/ci.yml)** - Build e test (2 job paralleli):
-
-I due job girano in parallelo perché sono completamente indipendenti: non si scambiano artefatti e usano runner separati. Il backend usa Maven per compilare e lanciare i 424 test; il frontend usa `npm ci` (installazione riproducibile da lockfile) e `npm run build` per verificare che il bundle TypeScript/React compili senza errori.
-
-| Job | Cosa fa |
-|-----|---------|
-| `build-backend` | `mvn -B package` nella directory `rentACar_backend/` - compila + esegue tutti i 424 test |
-| `build-frontend` | `npm ci && npm run build` nella directory `rent-a-car-frontend-project/` |
-
-**[`security.yml`](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/.github/workflows/security.yml)** - Security scanning (si attiva anche ogni lunedì 06:00 UTC tramite cron):
-
-Il workflow di sicurezza è separato dal CI per due motivi: può girare su schedule indipendente (cron settimanale per rilevare CVE nuove anche senza push), e i suoi job sono più lenti e non devono bloccare la fase di build/test. GitGuardian usa `fetch-depth: 0` per analizzare l'intera storia dei commit, non solo il diff del push. Snyk e Semgrep bloccano su finding HIGH/CRITICAL; SonarCloud calcola coverage e quality gate per entrambi i layer.
-
-| Job | Tool | Gate |
-|-----|------|------|
-| `gitguardian` | ggshield (full history `fetch-depth: 0`) | Blocca su segreti nel codice corrente |
-| `semgrep` | Semgrep OSS `config auto` | Blocca su finding attivi |
-| `snyk-backend` | Snyk Maven (`--severity-threshold=high`) | Blocca su HIGH/CRITICAL |
-| `snyk-frontend` | Snyk Node (`--severity-threshold=high`) | Blocca su HIGH/CRITICAL |
-| `sonarcloud-backend` | SonarCloud `mvn verify sonar:sonar` | Quality gate + coverage Java |
-| `sonarcloud-frontend` | SonarCloud `sonarcloud-github-action` | Quality gate + coverage TypeScript |
-
-### 8.2 Livello Backend ([`rentACar_backend/.github/workflows/`](https://github.com/aaselli2-unisa/rentACar_backend/tree/master/rentACar_backend/.github/workflows))
-
-Il backend ha una pipeline propria, più granulare, che si attiva su push/PR verso `master-dev`/`master`. È composta da 7 job con dipendenze esplicite. Il DAG è pensato per minimizzare il tempo di feedback: `gitguardian` gira subito in parallelo a tutto il resto (non ha bisogno del codice compilato), `compile` è il gate che sblocca tutti i job successivi.
+Si attiva su push verso `master-dev`/`master`, su pull request verso `master`, e tramite `workflow_dispatch` manuale. È composto da 6 job con dipendenze esplicite che formano un grafo aciclico diretto (DAG):
 
 ```
-gitguardian ─────────────────────────── (parallelo a compile, nessuna dipendenza)
+gitguardian ─────────────────────── (parallelo a compile, nessuna dipendenza)
 
 compile ──┬── security-tests ── sonarcloud
           ├── snyk
-          ├── semgrep
-          └── docker-validate
+          └── semgrep
 ```
 
-**[`ci.yml`](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/.github/workflows/ci.yml)** - Dettaglio dei job:
-
-`compile` è il gate iniziale: se Maven non compila, tutti i job downstream vengono saltati immediatamente senza consumare minuti runner. `security-tests` lancia i 403 test di sicurezza e salva il report Surefire XML come artefatto GitHub - `sonarcloud` lo scarica per calcolare la coverage senza rieseguire i test. `snyk` carica i risultati come SARIF nella Security tab di GitHub e poi esegue un secondo scan con `exit-code: 1` che blocca la CI se trova CVE HIGH/CRITICAL con fix disponibile. `docker-validate` builda l'immagine con BuildKit senza fare push (`push: false`) - verifica che il Dockerfile sia sintatticamente corretto e che tutte le dipendenze OS siano risolvibili.
-
-Il job `sonarcloud` usa `sonar.qualitygate.wait=false`: il job Maven completa non appena i dati vengono inviati a SonarCloud, senza aspettare che il Quality Gate venga calcolato. Il risultato appare nel dashboard SonarCloud in modo asincrono e non blocca il merge direttamente - scelta deliberata per non allungare il tempo di CI per analisi che impiegano 2-5 minuti.
+`compile` è il gate iniziale: se Maven non compila, tutti i job dipendenti vengono saltati senza consumare minuti runner. `security-tests` esegue la suite di test di sicurezza con il profilo Maven `-Psecurity-tests` e salva il report Surefire XML come artefatto GitHub; `sonarcloud` lo scarica per calcolare la coverage senza rieseguire i test. Il job `sonarcloud` usa `sonar.qualitygate.wait=false`: i dati vengono inviati a SonarCloud e il job termina subito, senza attendere il calcolo del quality gate (che impiega 2-5 minuti) — il risultato appare nel dashboard SonarCloud in modo asincrono.
 
 | Job | Timeout | Tool | Gate |
 |-----|---------|------|------|
-| `gitguardian` | 10 min | ggshield path scan (working tree) | Blocca su segreti nel codice attuale |
-| `compile` | 10 min | Maven | Gate iniziale - skip downstream se fallisce |
-| `security-tests` | 20 min | JUnit 5 + Surefire | 403 test sicurezza; artifact Surefire → SonarCloud |
-| `snyk` | 15 min | Snyk CLI (SARIF + gate separato) | SARIF → Security tab; gate blocca HIGH/CRITICAL upgradable |
-| `semgrep` | 10 min | Semgrep `semgrep ci` con APP_TOKEN | Blocca in base alla policy del dashboard Semgrep |
-| `docker-validate` | 15 min | BuildKit `push: false` | Blocca se Dockerfile non compila |
-| `sonarcloud` | 15 min | SonarCloud `sonar.qualitygate.wait=false` | Analisi asincrona - non blocca la CI; risultati nel dashboard |
+| `gitguardian` | 10 min | ggshield path scan (working tree, `--depth 1`) | `continue-on-error: true`; carica SARIF al tab Security |
+| `compile` | 10 min | `mvn -B -DskipTests compile` | Gate iniziale — skip downstream se fallisce |
+| `security-tests` | 20 min | JUnit 5 + Surefire, profilo `-Psecurity-tests` | Artefatto Surefire XML → SonarCloud |
+| `snyk` | 15 min | Snyk CLI Maven (`snyk test --maven-projects`) | SARIF → Security tab; gate blocca HIGH/CRITICAL con fix disponibile |
+| `semgrep` | 10 min | `semgrep ci` con `SEMGREP_APP_TOKEN` | Blocca secondo la policy del dashboard Semgrep |
+| `sonarcloud` | 15 min | `mvn -B compile sonar:sonar`, `qualitygate.wait=false` | Analisi asincrona — non blocca la CI |
 
-**[`deploy.yml`](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/rentACar_backend/.github/workflows/deploy.yml)** - Su push di tag `v*.*.*` o `workflow_dispatch` manuale:
+### 9.2 Workflow Deploy ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml))
 
-Il deploy è intenzionalmente separato dalla CI: si attiva solo con un tag Git esplicito (`v*.*.*`), non ad ogni push su `master`. Questo garantisce che il passaggio in produzione sia una decisione consapevole. Il job `publish` esegue tre step sequenziali: prima builda e pusha l'immagine su GHCR, poi esegue due scan Trivy separati - uno completo (SARIF per la Security tab, senza blocco) e uno gate che blocca solo su CRITICAL/HIGH con fix disponibile (`--ignore-unfixed`).
+Si attiva alla pubblicazione di una release GitHub (`on: release: types: [published]`) oppure tramite `workflow_dispatch` manuale per rollback o deploy di emergenza. È composto da 3 job sequenziali:
 
-| Step | Cosa fa |
-|------|---------|
-| Build + push | Builda l'immagine con BuildKit (cache GHA), push su `ghcr.io` con tag `x.y.z` + `latest` |
-| Trivy SARIF | Scansiona tutte le severità (`exit-code: 0`), carica risultati su GitHub Security tab |
-| Trivy gate | Blocca solo su CRITICAL/HIGH con fix disponibile (`ignore-unfixed: true`, `exit-code: 1`) |
+```
+build → scan → push
+```
 
-### 8.3 Sicurezza della Pipeline
+`build` costruisce l'immagine Docker con BuildKit senza fare push e la salva come artefatto compresso (`.tar`). `scan` carica l'artefatto ed esegue due scanner di sicurezza in parallelo: **Trivy** (genera SARIF con tutte le severità + gate su CRITICAL/HIGH con `--ignore-unfixed`) e **Docker Scout** (genera SARIF + gate con `ignore-base: true`, che filtra le vulnerabilità già presenti nell'immagine base e non attribuibili al codice applicativo). Il push su Docker Hub avviene **solo se entrambi i gate passano**.
 
-Ogni workflow applica il principio del minimo privilegio: i permessi sono dichiarati globalmente come `contents: read` e i job che necessitano di privilegi aggiuntivi (upload SARIF, push su GHCR) li dichiarano esplicitamente a livello di job. Tutti i job hanno `timeout-minutes` espliciti - senza timeout, un job appeso consumerebbe minuti runner illimitati e potrebbe bloccare altri workflow. I secret non compaiono mai nel codice: vengono letti dai GitHub Secrets e iniettati come variabili d'ambiente dal runner.
+| Job | Timeout | Cosa fa |
+|-----|---------|---------|
+| `build` | 20 min | BuildKit multi-tag (versione release + `:latest`), salva `.tar` come artefatto GitHub |
+| `scan` | 20 min | Trivy SARIF + gate `--ignore-unfixed`; Docker Scout SARIF + gate `ignore-base: true` |
+| `push` | 10 min | `docker push --all-tags` su Docker Hub (`$DOCKERHUB_USERNAME/rentacar-backend`) |
+
+### 9.3 Sicurezza della Pipeline
+
+Ogni workflow applica il principio del minimo privilegio: i permessi sono dichiarati globalmente come `contents: read` e i job che richiedono privilegi aggiuntivi (upload SARIF, push su Docker Hub) li dichiarano esplicitamente. Tutti i job hanno `timeout-minutes` espliciti per evitare che un job bloccato consumi minuti runner indefinitamente. I secret non compaiono mai nel codice sorgente: vengono letti dai GitHub Secrets e iniettati come variabili d'ambiente dal runner al momento dell'esecuzione.
 
 | Pratica | Implementazione |
 |---------|-----------------|
-| Permessi minimi | `permissions: contents: read` globale; permessi aggiuntivi dichiarati per-job (`security-events: write`, `packages: write`) |
-| Timeout espliciti | Tutti i job hanno `timeout-minutes` - nessun job può bloccare la pipeline indefinitamente |
-| Deploy separato dal CI | `deploy.yml` si attiva su push tag `v*.*.*` - il deploy di produzione richiede una decisione esplicita (git tag), non è automatico ad ogni push |
-| Nessun secret nel codice | `GITHUB_TOKEN` come variabile nativa GitHub; `SNYK_TOKEN`, `SEMGREP_APP_TOKEN`, `GITGUARDIAN_API_KEY`, `SONAR_TOKEN` come GitHub Secrets |
+| Permessi minimi | `permissions: contents: read` globale; `security-events: write` dichiarato per-job solo dove serve per l'upload SARIF |
+| Timeout espliciti | Tutti i job hanno `timeout-minutes` — nessun job può bloccare la pipeline indefinitamente |
+| Build separato dal push | `build` non fa push; il push avviene solo dopo che `scan` conferma assenza di CVE critiche |
+| Nessun secret nel codice | Tutti i secret letti da GitHub Secrets/Variables al momento dell'esecuzione |
 
-### 8.4 Segreti Pipeline
+### 9.4 Segreti Pipeline
 
-| Nome | Pipeline | Utilizzo |
-|------|:--------:|---------|
-| `GITGUARDIAN_API_KEY` | Entrambe | ggshield auth |
-| `SNYK_TOKEN` | Entrambe | Snyk CLI |
-| `SEMGREP_APP_TOKEN` | Entrambe | Semgrep regole |
-| `SONAR_TOKEN_BACKEND` | Root | SonarCloud backend |
-| `SONAR_TOKEN_FRONTEND` | Root | SonarCloud frontend |
-| `SONAR_TOKEN` | Backend | SonarCloud pipeline dedicata |
-| `GITHUB_TOKEN` | Backend CD | GHCR + SARIF Trivy |
-| `SONAR_ORGANIZATION` | Backend | Organizzazione SonarCloud |
-| `SONAR_PROJECT_KEY` | Backend | Chiave progetto SonarCloud |
+| Nome | Tipo | Workflow | Utilizzo |
+|------|------|:--------:|---------|
+| `GITGUARDIAN_API_KEY` | Secret | CI | ggshield auth |
+| `SNYK_TOKEN` | Secret | CI | Snyk CLI |
+| `SEMGREP_APP_TOKEN` | Secret | CI | Semgrep policy dashboard |
+| `SONAR_TOKEN` | Secret | CI | SonarCloud autenticazione |
+| `SONAR_ORGANIZATION` | Variable | CI | Organizzazione SonarCloud |
+| `SONAR_PROJECT_KEY` | Variable | CI | Chiave progetto SonarCloud |
+| `DOCKERHUB_USERNAME` | Secret | Deploy | Login Docker Hub + nome immagine |
+| `DOCKERHUB_TOKEN` | Secret | Deploy | Accesso token Docker Hub |
+
+---
+
+## 10. Kubernetes
+
+Il progetto è stato deployato su un server Ubuntu con **microk8s**, una distribuzione Kubernetes certificata CNCF pensata per ambienti single-node. I manifest sono nella cartella [`k8s/`](k8s/).
+
+### 10.1 Architettura
+
+```
+Internet
+  └── nginx-ingress-controller :80 (microk8s addon)
+        └── Service rentacar-frontend :80→8080
+              └── Pod nginx (React SPA + reverse proxy)
+                    └── /api/* → proxy_pass → Service rentacar-app :8080
+                                                └── Pod Spring Boot
+                                                      └── Service postgres :5432
+                                                            └── Pod PostgreSQL + PVC 5Gi
+```
+
+Il backend Spring Boot è un Service di tipo ClusterIP, raggiungibile solo dall'interno del cluster. Tutto il traffico esterno entra dall'Ingress, arriva al pod nginx del frontend, e solo le richieste verso `/api/` vengono inoltrate internamente allo Spring Boot tramite `proxy_pass`. Questo risolve anche il problema CORS: frontend e API risultano sulla stessa origine per il browser.
+
+### 10.2 Setup microk8s
+
+```bash
+sudo snap install microk8s --classic --channel=1.32/stable
+sudo usermod -aG microk8s $USER
+newgrp microk8s
+microk8s enable dns storage ingress
+```
+
+| Addon | Funzione |
+|-------|----------|
+| `dns` | CoreDNS: i pod si raggiungono per nome (`postgres`, `rentacar-app`) invece che per IP |
+| `storage` | hostpath-provisioner: soddisfa automaticamente le PersistentVolumeClaim con directory locali |
+| `ingress` | nginx-ingress-controller nel namespace `ingress`: riceve traffico sulla porta 80 del server |
+
+### 10.3 Secrets
+
+Le credenziali (password DB, JWT secret, API keys) non compaiono mai nei manifest YAML committati. Vengono create come oggetti Secret Kubernetes eseguendo lo script:
+
+```bash
+bash k8s/setup-secrets.sh
+```
+
+Lo script legge i file dalla directory `secrets/` (in `.gitignore`) e crea il Secret `rentacar-secrets` nel namespace `rentacar` con tecnica idempotente (`--dry-run=client -o yaml | kubectl apply`). I Secret vengono montati nei pod come file in `/run/secrets/`; Spring Boot con profilo `docker` legge le credenziali da quei file tramite `${file:/run/secrets/NOME}`.
+
+### 10.4 Build e Push Immagini
+
+Kubernetes non builda immagini: le scarica da un registry. Le immagini vengono buildate sulla macchina di sviluppo e pushate su Docker Hub con lo script:
+
+```bash
+bash k8s/build-push.sh          # tag :latest
+bash k8s/build-push.sh v1.2.3   # tag :v1.2.3 + :latest
+```
+
+In alternativa, la pubblicazione di una GitHub Release attiva automaticamente il workflow `deploy.yml` descritto in §9.2, che aggiunge i gate di sicurezza Trivy e Docker Scout prima del push.
+
+### 10.5 Manifest Kubernetes
+
+I manifest vengono applicati in ordine numerico dallo script `k8s/deploy.sh`:
+
+| File | Risorsa | Nota |
+|------|---------|------|
+| `00-namespace.yaml` | Namespace `rentacar` | Deve esistere prima di tutto il resto |
+| `01-configmap.yaml` | ConfigMap `rentacar-config` | Variabili non sensibili (URL DB, porta, host SMTP) |
+| `02-postgres.yaml` | PVC + Deployment + Service postgres | PVC `ReadWriteOnce` 5Gi; readiness/liveness via `pg_isready` |
+| `03-app.yaml` | Deployment + Service Spring Boot | initContainer `wait-for-postgres` (`nc -z postgres 5432`) |
+| `04-frontend.yaml` + `04b-nginx-config.yaml` | Deployment + Service nginx + ConfigMap nginx.conf | nginx su porta 8080; `emptyDir` per `/var/cache/nginx` |
+| `05-ingress.yaml` | Ingress | `pathType: Prefix` `/` → Service `rentacar-frontend` |
+| `06-networkpolicy.yaml` | 3 NetworkPolicy | Whitelist: postgres ← solo app; app ← solo frontend; frontend ← solo ingress |
+
+Ogni container ha `allowPrivilegeEscalation: false`, `drop: ["ALL"]` sulle Linux capabilities e `seccompProfile: RuntimeDefault`. Il container postgres usa `fsGroup: 999` a livello di pod spec per garantire che il PVC sia accessibile all'utente `postgres` (UID 999) senza richiedere privilegi root.
+
+### 10.6 Aggiornamenti
+
+```bash
+# Rollout restart dopo push nuova immagine
+microk8s kubectl rollout restart deployment/rentacar-app -n rentacar
+microk8s kubectl rollout restart deployment/rentacar-frontend -n rentacar
+microk8s kubectl rollout status deployment/rentacar-app -n rentacar
+
+# Aggiornamento manifest YAML
+microk8s kubectl apply -f k8s/NOME_FILE.yaml
+```
+
+### 10.7 Comandi utili di diagnostica
+
+```bash
+microk8s kubectl get pods -n rentacar
+microk8s kubectl logs -f -n rentacar -l app=rentacar-app
+microk8s kubectl logs -n rentacar <nome-pod> --previous
+microk8s kubectl exec -it deployment/rentacar-app -n rentacar -- sh
+microk8s kubectl exec -it deployment/postgres -n rentacar -- psql -U postgres -d rentacar
+microk8s kubectl describe pod <nome-pod> -n rentacar
+```
+
+### 10.8 Problemi Riscontrati e Soluzioni
+
+| # | Problema | Causa | Fix |
+|---|----------|-------|-----|
+| 1 | `x509: certificate is valid for 192.168.1.59, not 192.168.1.60` | IP LAN cambiato via DHCP; certificato kubelet generato con vecchio IP | `sudo microk8s refresh-certs --cert ca.crt`; fix permanente: IP statico tramite netplan |
+| 2 | `mkdir() "/var/cache/nginx/client_temp" failed (13: Permission denied)` | `runAsUser: 101` (nginx); directory owned da root | Mount `emptyDir` su `/var/cache/nginx` e `/var/run` |
+| 3 | `bind() to 0.0.0.0:80 failed (13: Permission denied)` | `NET_BIND_SERVICE` non applicabile con `drop: ["ALL"]` + `allowPrivilegeEscalation: false` | nginx configurato su porta 8080 tramite ConfigMap |
+| 4 | `read-only file system` al mount del service account token | Filesystem immagine in modalità restrittiva; K8s monta token SA automaticamente | `automountServiceAccountToken: false` nel pod spec |
+| 5 | `DataNotFoundException: Customer not found` al riavvio | Seed parziale: admin+employee creati, customer no; al riavvio il check `getAll().isEmpty()` trova utenti e salta la creazione | `try/catch` in `Application.run()` intorno a `seedDataConfig.runFirst()`; seed failure non-fatale |
+| 6 | 504 Gateway Timeout dall'Ingress | NetworkPolicy `frontend-allow-only-ingress` autorizzava porta 80; nginx cambiato a 8080 | Aggiornata policy per autorizzare porta 8080 |
+| 7 | Semgrep finding su `02-postgres.yaml`: `allow-privilege-escalation-no-securitycontext` | Nessun `securityContext` sul container postgres | Aggiunto `runAsUser: 999`, `runAsNonRoot: true`, `fsGroup: 999` e `fsGroupChangePolicy: OnRootMismatch` |
 
 ---
