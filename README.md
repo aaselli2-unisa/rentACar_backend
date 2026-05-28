@@ -1229,7 +1229,7 @@ Ogni workflow applica il principio del minimo privilegio: i permessi sono dichia
 
 ## 10. Kubernetes
 
-Il progetto è stato deployato su un server Ubuntu con **microk8s**, una distribuzione Kubernetes certificata CNCF pensata per ambienti single-node. I manifest sono nella cartella [`k8s/`](https://github.com/aaselli2-unisa/rentACar_backend/tree/master/k8s). Il server è raggiungibile tramite **Tailscale** (IP `100.113.22.29`): una VPN mesh per evitare di esporre porte pubbliche su internet.
+Il progetto è stato deployato su un server Ubuntu con **microk8s**, una distribuzione Kubernetes pensata per ambienti single-node. I manifest sono nella cartella [`k8s/`](https://github.com/aaselli2-unisa/rentACar_backend/tree/master/k8s). Il server è raggiungibile tramite **Tailscale** (IP `100.113.22.29`): una VPN mesh per evitare di esporre porte pubbliche su internet.
 
 **Perché Kubernetes invece di Docker Compose in produzione.**  
 Docker Compose risolve l'orchestrazione locale ma non offre garanzie di disponibilità: se un container crasha, non viene riavviato automaticamente a meno di `restart: unless-stopped`, e non è possibile definire policy di rete granulari. Kubernetes porta tre vantaggi concreti per questo progetto:
