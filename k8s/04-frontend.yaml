@@ -1,0 +1,150 @@
+# FRONTEND nginx — Deployment + Service
+#
+# Questo file replica il servizio frontend come nel docker-compose.yml.
+# Il frontend è servito da nginx. nginx ha anche il ruolo di reverse proxy per le API:
+# le richieste verso /api/ vengono inoltrate al pod Spring Boot internamente,
+# senza che queste mai escano dal cluster.
+#
+# Contiene due risorse:
+#   1. Deployment: esegue il container nginx con la configurazione custom
+#   2. Service: espone il frontend agli altri pod e all'Ingress
+#
+#   perché nginx come proxy per /api/:
+#   Il browser non può chiamare direttamente rentacar-app:8080 perché è un
+#   Service ClusterIP (accessibile solo dall'interno del cluster). Facendo
+#   passare le chiamate API attraverso nginx, il browser vede un unico
+#   host (il server) sia per il frontend che per il backend. Questo evita
+#   anche problemi di CORS, perché frontend e API risultano sullo stesso origine.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rentacar-frontend   # Nome del Deployment (usato da kubectl per gestirlo)
+  namespace: rentacar
+spec:
+  replicas: 1               # Una sola replica nginx.
+  selector:
+    matchLabels:
+      app: rentacar-frontend  # Il Deployment gestisce i pod con questa label.
+                              # Deve corrispondere a template.metadata.labels sotto.
+
+  template:
+    metadata:
+      labels:
+        app: rentacar-frontend  # Label attaccata a ogni pod creato da questo Deployment.
+                                # Usata sia dal selector sopra che dal Service sotto
+                                # per trovare i pod corretti.
+    spec:
+      securityContext:
+        runAsNonRoot: true      # K8s rifiuta il pod se il container gira come root.
+                                # nginx di default gira come root per poter usare la
+                                # porta 80; usiamo la porta 8080 nel ConfigMap per evitarlo.
+        seccompProfile:
+          type: RuntimeDefault  # Abilita il profilo seccomp del container runtime.
+                                # Blocca syscall non necessarie
+
+      containers:
+        - name: rentacar-frontend
+          image: ben03030303/rentacar-frontend:latest
+          # Immagine Docker Hub buildatha dal Dockerfile del frontend
+          # Contiene i file statici React compilati e nginx per servirli.
+          # "latest" usa sempre l'ultima versione pushata dal workflow di deploy.
+
+          securityContext:
+            allowPrivilegeEscalation: false   # Il processo nginx non può acquisire più
+                                              # privilegi del processo padre.
+            capabilities:
+              drop: ["ALL"]   # Rimuove tutte le Linux capabilities dal container.
+                              # nginx non ha bisogno di nessuna capability
+
+            runAsUser: 101    # UID dell'utente "nginx" nell'immagine nginx ufficiale.
+
+          imagePullPolicy: Always   # Verifica sempre se c'è una versione più recente su
+                                    # Docker Hub prima di avviare il pod
+          ports:
+            - containerPort: 8080   # Porta su cui nginx ascolta
+
+          volumeMounts:
+            - name: nginx-cache
+              mountPath: /var/cache/nginx   # nginx ha bisogno di scrivere file temporanei
+                                            # in questa directory (buffer delle risposte,
+                                            # file temporanei per proxy). Con il filesystem
+                                            # del container in read-only questa directory
+                                            # deve essere un volume scrivibile.
+            - name: nginx-pid
+              mountPath: /var/run           # nginx scrive qui il file nginx.pid con il PID
+                                            # del processo master. Anche questa deve essere scrivibile.
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/default.conf   # Monta la configurazione nginx
+                                                          # dal ConfigMap 04b-nginx-config.yaml.
+
+              subPath: default.conf   # "subPath" monta solo la chiave "default.conf" del ConfigMap
+                                      # come file singolo, non l'intero ConfigMap come directory.
+
+              readOnly: true          # La configurazione nginx non deve essere modificabile
+                                      # dal container a runtime.
+
+          readinessProbe:
+            httpGet:
+              path: /       # nginx è pronto quando risponde con 200 alla root "/".
+              port: 8080    # Stessa porta di containerPort sopra.
+            initialDelaySeconds: 10   # nginx parte molto velocemente
+
+            periodSeconds: 5          # Ricontrolla ogni 5 secondi finché non è ready.
+            # Finché non è ready, il Service non manda traffico a questo pod,
+            # e l'Ingress non riceve risposte dal frontend.
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15   # Aspetta 15s prima del primo check liveness.
+            periodSeconds: 30         # Controlla ogni 30s. Se fallisce, K8s riavvia
+                                      # il container.
+          resources:
+            requests:
+              memory: "64Mi"    # 64MB garantiti.
+              cpu: "50m"        # 50 millicores = 0.05 CPU.
+            limits:
+              memory: "128Mi"   # 128MB massimo.
+              cpu: "200m"       # 0.2 CPU massimo.
+
+      volumes:
+        - name: nginx-cache
+          emptyDir: {}    # Volume temporaneo in-memory
+                          # Viene creato vuoto all'avvio del pod e distrutto quando
+                          # il pod termina per file di cache temporanei.
+        - name: nginx-pid
+          emptyDir: {}    # Stesso tipo: volume temporaneo per il file PID di nginx.
+                          # Non serve persistenza: il PID cambia ad ogni avvio.
+        - name: nginx-conf
+          configMap:
+            name: nginx-conf    # Riferimento al ConfigMap definito in 04b-nginx-config.yaml.
+                                # K8s monta ogni chiave del ConfigMap come file nella directory.
+
+---
+
+# Service — rentacar-frontend
+#
+# L'Ingress non può puntare direttamente a un pod perché l'IP del pod è effimero:
+# cambia ad ogni riavvio. Il Service ha un ClusterIP fisso e un nome DNS stabile
+# ("rentacar-frontend") che l'Ingress usa come destinatario del traffico
+
+# Mapping porte: il container nginx ascolta su 8080 (porta non privilegiata, gira
+# senza root). Il Service espone la porta 80 e forwarda internamente su 8080.
+# Dall'Ingress e dal browser si vede sempre porta 80 standard.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: rentacar-frontend   # Nome referenziato in 05-ingress.yaml sotto backend.service.name
+  namespace: rentacar
+spec:
+  selector:
+    app: rentacar-frontend  # Manda traffico ai pod con questa label (pod del Deployment sopra)
+  ports:
+    - port: 80              # Porta esposta dal Service (quella che l'Ingress chiama)
+      targetPort: 8080      # Porta del container nginx a cui forwardare il traffico
+  # type non specificato → ClusterIP (default).
+  # Il Service è raggiungibile solo dall'interno del cluster.
+  # L'accesso dall'esterno avviene esclusivamente tramite l'Ingress (05-ingress.yaml).

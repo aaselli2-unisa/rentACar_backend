@@ -1,0 +1,20 @@
+# NAMESPACE — rentacar
+#
+# Un Namespace in K8s è un "contenitore logico" che isola le risorse del progetto.
+# Tutti gli oggetti che creiamo (Deployment, Service, Secret, ConfigMap, ecc.)
+# appartengono al namespace "rentacar" e sono separati da qualsiasi altra cosa
+# giri sullo stesso cluster.
+#
+
+# Come viene usato:
+#   Ogni file manifest ha "namespace: rentacar" nel metadata.
+#   Ogni comando kubectl usa "-n rentacar" per operare su questo namespace.
+#   Esempio: microk8s kubectl get pods -n rentacar
+#
+# Questo file deve essere applicato per PRIMO (00-namespace.yaml) perché tutti
+# gli altri manifest dichiarano "namespace: rentacar" che deve già esistere.
+
+apiVersion: v1        # API group di base K8s, tutti gli oggetti "core" usano v1
+kind: Namespace       # Tipo di risorsa: namespace
+metadata:
+  name: rentacar      # Nome del namespace; referenziato in tutti gli altri manifest

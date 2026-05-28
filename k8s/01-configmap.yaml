@@ -1,0 +1,54 @@
+# CONFIGMAP rentacar-config
+
+# Un ConfigMap contiene coppie chiave-valore NON sensibili da iniettare
+# come variabili d'ambiente nei container. È separato dai Secret (che
+# contengono dati sensibili).
+
+# Origine di questi valori:
+#   Corrispondono esattamente al file .env del progetto (env_file nel
+#   docker-compose.yml). In Docker Compose il file .env veniva letto
+#   automaticamente; in K8s lo sostituiamo con questo ConfigMap.
+
+# Come viene usato:
+#   Il Deployment di Spring Boot (03-app.yaml) usa "envFrom: configMapRef"
+#   per iniettare TUTTE queste chiavi come env vars nel container.
+
+apiVersion: v1         # API group core
+kind: ConfigMap        # Tipo: mappa di configurazione non sensibile
+metadata:
+  name: rentacar-config   # Nome referenziato in 03-app.yaml sotto envFrom.configMapRef.name
+  namespace: rentacar      # Stesso namespace di tutti gli altri oggetti del progetto
+
+data:
+  # Porta su cui Spring Boot ascolta dentro il container.
+  # Deve matchare EXPOSE 8080 nel Dockerfile e containerPort in 03-app.yaml.
+  SERVER_PORT: "8080"
+
+  # URL base dell'applicazione, usato per generare link
+  # nelle email (es. link di reset password). Usiamo
+  # l'IP pubblico (tailscale) del server.
+  APP_BASE_URL: "http://100.113.22.29/"
+
+  # Durata di validità del JWT in millisecondi: 86400000ms = 24 ore.
+  # Valore identico al .env del progetto.
+  JWT_EXPIRATION_MS: "86400000"
+
+  # JDBC URL per la connessione al database PostgreSQL.
+  # "postgres" è il nome del Service K8s definito in 02-postgres.yaml.
+  # In K8s, i Service sono raggiungibili per nome DNS all'interno dello
+  # stesso namespace: postgres → 10.x.x.x (ClusterIP assegnato da K8s).
+  DB_URL: "jdbc:postgresql://postgres:5432/rentacar"
+
+  # Username PostgreSQL. La password è in Secret (rentacar-secrets)
+  # per non esporla in chiaro qui.
+  DB_USERNAME: "postgres"
+
+  # Host server SMTP per l'invio email. Gmail richiede porta 587 + STARTTLS.
+  # Le credenziali (MAIL_USERNAME, MAIL_PASSWORD) sono in Secret.
+  MAIL_HOST: "smtp.gmail.com"
+  MAIL_PORT: "587"
+
+  # Profilo Spring attivo. Il profilo "docker" carica
+  # application-docker.properties che legge le password da file
+  # (/run/secrets/) invece che da env vars in chiaro.
+  SPRING_PROFILES_ACTIVE: "docker"

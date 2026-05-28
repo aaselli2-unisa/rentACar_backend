@@ -1,0 +1,169 @@
+
+# SPRING BOOT APP — Deployment + Service
+
+# Questo file replica il servizio "app" del docker-compose.yml.
+# Contiene due risorse:
+#
+#   1. Deployment: esegue il container Spring Boot con secrets e config
+#   2. Service: espone la porta 8080 agli altri pod (in particolare al frontend)
+#
+#   In K8s non esiste depends_on nativo tra Deployment. Lo sostituiamo con
+#   un initContainer che blocca l'avvio finché postgres:5432 non risponde.
+#
+# IMPORTANTE: il Service si chiama "rentacar-app" questo nome deve
+# corrispondere esattamente a quello nel nginx.conf del frontend
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rentacar-app     # Nome del Deployment
+  namespace: rentacar
+spec:
+  replicas: 1            # Una sola istanza Spring Boot.
+  selector:
+    matchLabels:
+      app: rentacar-app  # Identifica i pod gestiti da questo Deployment
+
+  template:
+    metadata:
+      labels:
+        app: rentacar-app  # Label usata da selector sopra e dal Service sotto
+    spec:
+
+      automountServiceAccountToken: false # Inutile in questo caso
+      securityContext:
+        runAsNonRoot: true      # K8s rifiuta il pod se il container gira come root
+        seccompProfile:
+          type: RuntimeDefault  # Abilita il profilo seccomp di default del runtime (syscall di default)
+
+      initContainers:
+        # initContainer: un container "di preparazione" che gira PRIMA del container principale.
+        # K8s aspetta che tutti gli initContainer completino con exit 0 prima di avviare l'app.
+        # Quindi aspetta che la porta postgres:5432 risponda prima di cedere il controllo a Spring Boot.
+        - name: wait-for-postgres
+          image: busybox:1.36        # Immagine minima con utility di base Unix
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z postgres 5432; do
+                echo "waiting for postgres..."; sleep 3;
+              done
+              # nc -z: netcat, tenta connessione TCP a postgres:5432
+              # Loop finché non riesce → esce → K8s avvia il container principale
+              # "postgres" viene risolto via DNS dal Service 02-postgres.yaml
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]    # Anche l'initContainer non ha bisogno di nessuna capability
+            runAsNonRoot: true
+            runAsUser: 65534   # UID dell'utente "nobody" in busybox (utente senza privilegi)
+
+      containers:
+        - name: rentacar-app
+          # Immagine buildata e pushata dal workflow deploy.yml su Docker Hub.
+          # "latest" usa sempre l'ultima versione pushata.
+          image: ben03030303/rentacar-backend:latest
+
+          securityContext:
+            allowPrivilegeEscalation: false  # Il processo non può ottenere più privilegi del parent
+            capabilities:
+              drop: ["ALL"]                  # Rimuove tutte le Linux capabilities (NET_RAW, SYS_PTRACE, ecc.)
+
+            runAsUser: 10001                 # UID dell'utente "appuser" creato nel Dockerfile
+            runAsGroup: 10001
+
+          imagePullPolicy: Always   # Ogni volta che il pod parte, verifica se c'è
+                                    # una versione più recente su Docker Hub.
+
+          envFrom:
+            - configMapRef:
+                name: rentacar-config  # Inietta TUTTE le chiavi del ConfigMap 01-configmap.yaml
+                                       # come variabili d'ambiente nel container:
+                                       # SERVER_PORT, DB_URL, DB_USERNAME, MAIL_HOST, ecc.
+
+
+          ports:
+            - containerPort: 8080    # Porta su cui Spring Boot ascolta (SERVER_PORT nel ConfigMap).
+                                     # Deve matchare EXPOSE 8080 nel Dockerfile.
+
+          volumeMounts:
+            - name: app-secrets
+              mountPath: /run/secrets   # Monta il Secret come directory.
+                                        # K8s crea un file per ogni chiave del Secret:
+                                        #   /run/secrets/DB_PASSWORD
+                                        #   /run/secrets/JWT_SECRET
+                                        #   /run/secrets/CLOUDINARY_CLOUD_NAME
+                                        #   /run/secrets/CLOUDINARY_API_KEY
+                                        #   /run/secrets/CLOUDINARY_API_SECRET
+                                        #   /run/secrets/MAIL_USERNAME
+                                        #   /run/secrets/MAIL_PASSWORD
+                                        # Spring Boot con profilo "docker" legge questi file.
+
+              readOnly: true            # Il container non deve poter modificare i secret.
+
+          readinessProbe:
+            # Spring Boot Actuator espone /actuator/health.
+            # K8s usa questa probe per sapere quando l'app è pronta a servire richieste.
+            # Finché non è ready, il Service non manda traffico a questo pod.
+            # Stesso endpoint del HEALTHCHECK nel Dockerfile.
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60  # 60s di attesa prima del primo check evita falsi negativi.
+            periodSeconds: 10        # Check ogni 10 secondi
+            failureThreshold: 10     # 10 fallimenti poi "not ready"
+
+          livenessProbe:
+            # Se questa probe fallisce, K8s RIAVVIA il container.
+            # Stessa probe di readiness ma soglie più conservative: non vogliamo
+            # riavviare l'app se è solo lenta, solo se è davvero bloccata.
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 90  # Aspetta 90s prima del primo check liveness
+            periodSeconds: 30        # Check ogni 30 secondi (meno aggressivo)
+
+          resources:
+            requests:
+              # "requests": quantità di risorse GARANTITE al pod dal scheduler K8s.
+              # K8s usa questi valori per decidere su quale nodo schedulare il pod.
+              memory: "512Mi"  # 512MB garantiti
+              cpu: "250m"      # 250 millicores = 0.25 CPU.
+            limits:
+              # "limits": massimo che il container può consumare.
+              # Se supera memory limit viene riavviato. Se supera cpu limit -> throttled (rallentato).
+              memory: "1Gi"    # 1GB massimo.
+              cpu: "1000m"     # 1 CPU massimo durante spike di richieste.
+
+      volumes:
+        - name: app-secrets          # Volume che soddisfa il volumeMount "app-secrets" sopra
+          secret:
+            secretName: rentacar-secrets  # Secret creato da setup-secrets.sh
+                                          # K8s crea automaticamente un file per ogni chiave.
+
+---
+
+# Service — rentacar-app
+
+# Espone il pod Spring Boot agli altri pod del cluster con IP stabile e DNS.
+#
+# il nome "rentacar-app" deve corrispondere a quello nel nginx.conf
+# del frontend (proxy_pass http://rentacar-app:8080/api/).
+# Il frontend nginx risolve "rentacar-app" tramite CoreDNS -> ClusterIP di questo Service.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: rentacar-app     # Nome DNS del service. Il frontend nginx.conf usa esattamente questo nome.
+  namespace: rentacar
+spec:
+  selector:
+    app: rentacar-app    # Manda traffico ai pod con label "app: rentacar-app"
+  ports:
+    - port: 8080         # Porta esposta dal Service
+      targetPort: 8080   # Porta del container Spring Boot
+  # type: ClusterIP, accessibile solo dall'interno del cluster.
+  # Il backend NON è esposto direttamente a internet: tutto il traffico
+  # esterno passa per il frontend nginx che fa da proxy su endpoint /api/.

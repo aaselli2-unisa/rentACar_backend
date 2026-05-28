@@ -1,0 +1,113 @@
+# NETWORK POLICY — Firewall a livello di pod
+
+# Per default K8s non limita il traffico tra pod: qualsiasi pod nel cluster
+# può parlare con qualsiasi altro pod su qualsiasi porta.
+# se il pod frontend venisse compromesso, potrebbe connettersi direttamente
+# al database PostgreSQL senza passare dal backend.
+#
+# Le NetworkPolicy funzionano come regole firewall applicate ai singoli pod.
+# Richiedono un plugin di rete che le supporti: microk8s usa Calico di default,
+
+# Come funziona la logica:
+#   - Appena aggiungiamo UNA NetworkPolicy su un pod (via podSelector):
+#     tutto il traffico del tipo specificato (Ingress o Egress) viene NEGATO
+#     per quel pod, TRANNE le eccezioni dichiarate nella policy stessa.
+#     Policy deny all: specifichiamo cosa è permesso, il resto è negato.
+#
+# Architettura applicata — principio del minimo privilegio:
+#
+#   Internet
+#     → ingress-controller (namespace ingress)
+#       → frontend:80        [permesso da policy 3]
+#         → app:8080         [permesso da policy 2]
+#           → postgres:5432  [permesso da policy 1]
+#
+#   Il frontend NON può parlare con postgres. L'app NON può ricevere traffico
+#   diretto dall'esterno. Il DB è completamente isolato dall'esterno.
+#
+#   L'Egress è lasciato libero per semplicità: lo Spring Boot ha bisogno di
+#   connettersi a servizi esterni (Gmail SMTP per le email, Cloudinary per
+#   le immagini).
+
+# 1. postgres: nega tutto, permetti solo da rentacar-app
+# Il frontend nginx non può raggiungere postgres direttamente
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow-only-app
+  namespace: rentacar
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres       # Questa policy si applica ai pod con label "app: postgres"
+  policyTypes:
+    - Ingress             # Controlla il traffico in ENTRATA verso postgres
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: rentacar-app   # Permetti solo dai pod Spring Boot
+      ports:
+        - protocol: TCP
+          port: 5432              # Solo porta PostgreSQL
+
+---
+
+# 2. rentacar-app nega tutto, permetti solo da rentacar-frontend
+
+# L'API Spring Boot riceve richieste solo dal frontend nginx (via proxy /api/).
+# Nessun altro pod, e nessun accesso diretto dall'esterno, può raggiungere
+# la porta 8080 dello Spring Boot.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-allow-only-frontend
+  namespace: rentacar
+spec:
+  podSelector:
+    matchLabels:
+      app: rentacar-app   # Questa policy si applica ai pod Spring Boot
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: rentacar-frontend  # Solo il frontend nginx può chiamare /api/
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+
+# 3. rentacar-frontend nega tutto, permetti solo dall'ingress-controller
+
+# Il frontend nginx riceve traffico solo dall'ingress-controller di microk8s,
+# che è il punto di ingresso ufficiale dal mondo esterno. Nessun pod interno
+# può parlare direttamente col frontend
+#
+# namespaceSelector + podSelector insieme: il traffico deve venire DA un pod
+# con label "name: nginx-ingress-microk8s" che si trova nel namespace "ingress".
+# Entrambe le condizioni devono essere vere
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-allow-only-ingress
+  namespace: rentacar
+spec:
+  podSelector:
+    matchLabels:
+      app: rentacar-frontend  # Questa policy si applica ai pod frontend nginx
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress   # Namespace dell'ingress-controller in microk8s
+          podSelector:
+            matchLabels:
+              name: nginx-ingress-microk8s           # Label del pod ingress-controller in microk8s
+      ports:
+        - protocol: TCP
+          port: 8080

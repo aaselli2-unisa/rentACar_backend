@@ -1,0 +1,160 @@
+# POSTGRES PersistentVolumeClaim + Deployment + Service
+
+# Questo file definisce tre risorse K8s separate che
+# insieme replicano il servizio "postgres" del docker-compose.yml:
+#
+#   1. PersistentVolumeClaim (PVC): richiesta di storage su disco per i dati DB
+#   2. Deployment: definisce come girare il container postgres
+#   3. Service: espone postgres agli altri pod per nome DNS "postgres"
+
+
+# 1. PersistentVolumeClaim — pgdata-pvc
+# Un PVC è una "richiesta di storage": come dire al cluster "mi servono 5GB di disco".
+# I container K8s sono effimeri, se il pod postgres viene ricreato,
+# il filesystem interno viene distrutto. Il PVC persiste i dati anche
+# se il pod crasha o viene eliminato.
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgdata-pvc      # Nome referenziato sotto volumes.persistentVolumeClaim.claimName
+  namespace: rentacar
+spec:
+  accessModes:
+    - ReadWriteOnce     # Il volume può essere montato in lettura/scrittura da UN SOLO nodo
+                        # alla volta. # (ReadWriteMany richiederebbe NFS o storage distribuito)
+  resources:
+    requests:
+      storage: 5Gi      # 5 gigabyte di storage.
+                        # microk8s hostpath-provisioner lo mappa su /var/snap/microk8s/
+                        # common/default-storage/ sul server Ubuntu.
+
+---
+# 2. Deployment — postgres
+# Un Deployment dichiara lo stato desiderato
+# K8s si occupa di far corrispondere la
+# realtà a questa dichiarazione (se il pod crasha, lo ricrea).
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres         # Nome del Deployment
+  namespace: rentacar
+spec:
+  replicas: 1            # Una sola istanza PostgreSQL.
+
+  selector:
+    matchLabels:
+      app: postgres      # Il Deployment gestisce i pod con label "app: postgres".
+                         # Deve matchare template.metadata.labels qui sotto.
+
+  template:              # Template del pod: ogni replica viene creata da questo
+    metadata:
+      labels:
+        app: postgres    # Label che identifica questo pod. Usato da:
+                         # selector.matchLabels sopra (Deployment trova i suoi pod)
+                         # Service selector (trova i pod a cui mandare traffico)
+    spec:
+      securityContext:
+        fsGroup: 999                         # K8s cambia il gruppo del PVC a 999 (utente "postgres")
+                                             # prima di avviare il container. Garantisce che il
+                                             # processo postgres (UID 999) possa scrivere i dati
+                                             # anche su PVC creati da root (hostpath-provisioner).
+        fsGroupChangePolicy: OnRootMismatch  # Esegue il chown ricorsivo solo se la directory root
+                                             # del volume non appartiene già al gruppo corretto.
+                                             # Evita operazione lenta su dataset esistenti grandi.
+
+      containers:
+        - name: postgres          # Nome del container dentro il pod
+          image: postgres:16      # Immagine Docker ufficiale PostgreSQL versione 16.
+
+          securityContext:
+            runAsNonRoot: true              # Il container gira come utente non-root.
+            runAsUser: 999                  # UID dell'utente "postgres" nell'immagine ufficiale.
+                                            # Con fsGroup sul pod, il PVC è già accessibile in
+                                            # scrittura da questo UID prima dell'avvio.
+            runAsGroup: 999
+            allowPrivilegeEscalation: false # Il processo non può acquisire più privilegi del parent.
+
+          env:
+            - name: POSTGRES_DB   # Nome del database da creare all'avvio del container.
+              value: rentacar     # Stesso valore del docker-compose.yml (POSTGRES_DB: rentacar).
+
+            - name: POSTGRES_USER # Username dell'utente PostgreSQL da creare.
+              value: postgres     # Deve matchare DB_USERNAME nel ConfigMap (01-configmap.yaml).
+
+            - name: POSTGRES_PASSWORD_FILE
+              # Dice a postgres:16 di leggere la password da un FILE invece che
+              # da una env var in chiaro (POSTGRES_PASSWORD). Più sicuro.
+              # Il percorso /run/secrets/DB_PASSWORD è montato dal volume sotto.
+              value: /run/secrets/DB_PASSWORD
+
+          ports:
+            - containerPort: 5432  # Porta standard PostgreSQL. Esposta solo internamente
+                                   # al pod; il Service sotto la rende accessibile al cluster.
+
+          volumeMounts:
+            - name: pgdata               # Monta il PVC pgdata-pvc definito sopra
+              mountPath: /var/lib/postgresql/data  # Percorso standard dove postgres
+                                                   # scrive i dati.
+
+            - name: db-secret            # Monta il Secret K8s come file
+              mountPath: /run/secrets/DB_PASSWORD  # Percorso atteso da POSTGRES_PASSWORD_FILE
+              subPath: DB_PASSWORD       # "subPath" monta solo la chiave "DB_PASSWORD" del Secret
+                                         # come file, non l'intero Secret come directory.
+              readOnly: true             # Il container non deve sovrascrivere il secret.
+
+          readinessProbe:
+            # K8s usa readinessProbe per decidere se il pod è pronto a ricevere traffico.
+            # Finché non è ready, il Service non manda richieste a questo pod.
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "rentacar"]
+              # pg_isready: utility postgres che verifica connettività al DB
+            initialDelaySeconds: 10  # Aspetta 10s prima del primo check
+            periodSeconds: 5         # Riprova ogni 5 secondi
+            failureThreshold: 10     # Dopo 10 fallimenti consecutivi → pod "not ready"
+
+          livenessProbe:
+            # livenessProbe: se fallisce, K8s RIAVVIA il container.
+            # Stessa logica di readiness ma con soglie più alte (non vogliamo
+            # riavvii frequenti)
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "rentacar"]
+            initialDelaySeconds: 30  # Aspetta 30s prima del primo check liveness
+            periodSeconds: 10
+
+      volumes:
+        - name: pgdata               # Volume che soddisfa il mount "pgdata" sopra
+          persistentVolumeClaim:
+            claimName: pgdata-pvc   # Riferimento al PVC definito in cima a questo file
+
+        - name: db-secret            # Volume che soddisfa il mount "db-secret" sopra
+          secret:
+            secretName: rentacar-secrets  # Secret K8s creato da setup-secrets.sh
+                                          # Contiene DB_PASSWORD, JWT_SECRET, ecc.
+
+---
+
+# 3. Service — postgres
+
+# Un Service K8s espone i pod con un IP stabile e un nome DNS.
+# Senza Service, i pod hanno IP effimeri che cambiano ad ogni riavvio.
+# Con questo Service, Spring Boot può connettersi semplicemente a "postgres:5432".
+# K8s risolve "postgres" -> ClusterIP di questo Service via CoreDNS.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres         # Nome DNS del service. Raggiungibile come "postgres" dagli
+                         # altri pod nello stesso namespace
+  namespace: rentacar
+spec:
+  selector:
+    app: postgres        # Manda traffico ai pod con label "app: postgres"
+                         # (cioè i pod del Deployment postgres sopra)
+  ports:
+    - port: 5432         # Porta esposta dal Service (quella che usano i client)
+      targetPort: 5432   # Porta del container a cui forwardare il traffico
+                         # (containerPort del Deployment sopra)
+  # type non specificato → default ClusterIP:
+  # il Service è raggiungibile SOLO dall'interno del cluster, non dall'esterno.
