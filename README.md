@@ -117,7 +117,7 @@ All'avvio, `SeedDataConfig` popola automaticamente le tabelle di lookup: marche,
 | **PostgreSQL driver** | 42.7.11 | Connettività database (pinned per CVE fix) |
 | **JWT (jjwt)** | 0.11.2 | Generazione e validazione token HS256 |
 | **Bucket4j** | 8.0.1 | Rate limiting con algoritmo token-bucket (ogni IP dispone di un "secchio" di token che si ricarica a velocità fissa; ogni richiesta consuma un token; quando il secchio è vuoto si risponde 429) |
-| **Caffeine** | 3.13.0 | Cache bounded per bucket per-IP (eviction 2 min, max 50k entry) |
+| **Caffeine** | 3.2.3 | Cache bounded per bucket per-IP (eviction 2 min, max 50k entry) |
 | **Cloudinary SDK** | 1.27.0 | Storage immagini |
 | **commons-text** | 1.10.0 | Escape/sanitize stringhe |
 | **Lombok** | 1.18.30 | Riduzione boilerplate |
@@ -201,7 +201,7 @@ nginx è l'unico punto esposto all'host. Backend e database comunicano sulla ret
 | Componente | File | Cosa fa |
 |------------|------|---------|
 | JWT Filter | `JwtAuthFilter.java` | Su ogni richiesta estrae il token dal cookie, ne verifica firma e scadenza e imposta l'identità dell'utente per il resto della catena |
-| Rate Limiter | `RateLimitFilter.java` | Conta le richieste per IP e blocca con HTTP 429 chi supera 10 req/min su `/api/**` |
+| Rate Limiter | `RateLimitFilter.java` | Conta le richieste per IP e blocca con HTTP 429 chi supera 10 req/min su `/api/v1/auth/**`, `/api/v1/refresh-token/**` e POST `/api/v1/images/**` |
 | Security Config | `SecurityConfig.java` | Definisce quali endpoint sono pubblici e quali richiedono autenticazione o ruolo specifico |
 
 ### 2.2 Ruoli
@@ -209,10 +209,10 @@ nginx è l'unico punto esposto all'host. Backend e database comunicano sulla ret
 | Ruolo | Descrizione |
 |-------|-------------|
 | **Admin** | Gestione completa: utenti, veicoli, noleggi, sconti, pagamenti, report, immagini |
-| **Employee** | Gestione operativa: avanzamento stato noleggi (via business logic) |
+| **Employee** | Accesso ai cataloghi veicoli e dati di sola lettura; nessun accesso ai noleggi |
 | **Customer** | Ricerca veicoli, prenotazione e gestione dei propri noleggi |
 
-Employee e Customer non si distinguono a livello Spring Security: entrambi sono `authenticated()`. La distinzione tra i due è gestita nel service layer.
+Employee e Customer hanno lo stesso livello di accesso a livello Spring Security: entrambi sono `authenticated()` e ricevono 403 su endpoint ADMIN (noleggi, utenti, pagamenti). La gestione dei noleggi è riservata esclusivamente ad ADMIN, sia in `SecurityConfig` che tramite `@PreAuthorize("hasRole('ADMIN')")` sui controller.
 
 ### 2.3 Matrice di Accesso RBAC
 
@@ -412,7 +412,7 @@ Il fork originale configurava la filter chain di Spring Security con `anyRequest
 
 **Test:** invia richieste con token Admin, Employee, Customer e senza token su ogni endpoint del sistema. Per gli endpoint pubblici (`/auth/**`, `/actuator/health`) verifica 200 o 404; per tutti gli altri verifica 401 senza token e 403 con ruolo insufficiente.
 
-**Patch:** [`SecurityConfig`](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/src/main/java/src/core/config/SecurityConfig.java) riscritto con `anyRequest().denyAll()` e regole esplicite per ogni endpoint.
+**Patch:** [`SecurityConfig`](https://github.com/aaselli2-unisa/rentACar_backend/blob/master/src/main/java/src/core/config/SecurityConfig.java) riscritto con `anyRequest().authenticated()` come catch-all e regole esplicite per ogni endpoint (endpoint ADMIN con `hasRole("ADMIN")`, endpoint pubblici con `permitAll()`).
 
 ---
 
@@ -667,7 +667,7 @@ Gli endpoint di autenticazione erano completamente privi di protezione contro gl
 
 **Vulnerabilità:** l'endpoint originale accettava la password come query parameter (`GET /isUserTrue?password=...`); le password finivano in chiaro negli access log del server.
 
-**Test:** verifica che la password in query string venga rifiutata, che signup rifiuti payload malformati (400), che signin risponda 401 a credenziali errate, e che path sconosciuti rispettino `anyRequest().denyAll()`.
+**Test:** verifica che la password in query string venga rifiutata, che signup rifiuti payload malformati (400), che signin risponda 401 a credenziali errate, e che path sconosciuti rispettino `anyRequest().authenticated()` (401 senza token, 404/403 con token valido).
 
 | Scenario | Comportamento |
 |----------|--------------|
