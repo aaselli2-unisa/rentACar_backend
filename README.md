@@ -18,6 +18,15 @@ SW Engineering for Secure Cloud Systems · A.A. 2025/2026
 
 [![CI](https://github.com/aaselli2-unisa/rentACar_backend/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/aaselli2-unisa/rentACar_backend/actions/workflows/ci.yml)
 [![Deploy](https://github.com/aaselli2-unisa/rentACar_backend/actions/workflows/deploy.yml/badge.svg)](https://github.com/aaselli2-unisa/rentACar_backend/actions/workflows/deploy.yml)
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-ben03030303-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/u/ben03030303)
+
+<br>
+
+| Risorsa | Link |
+|---|---|
+| **Backend** | [github.com/aaselli2-unisa/rentACar_backend](https://github.com/aaselli2-unisa/rentACar_backend) |
+| **Frontend** | [github.com/aaselli2-unisa/rent-a-car-frontend-project](https://github.com/aaselli2-unisa/rent-a-car-frontend-project) |
+| **Docker Hub** | [hub.docker.com/u/ben03030303](https://hub.docker.com/u/ben03030303) |
 
 <br>
 
@@ -72,8 +81,9 @@ SW Engineering for Secure Cloud Systems · A.A. 2025/2026
    - [9.1 Workflow CI](#91-workflow-ci-githubworkflowsciyml)
    - [9.2 Workflow Deploy](#92-workflow-deploy-githubworkflowsdeployyml)
    - [9.3 Workflow Deploy Frontend](#93-workflow-deploy-frontend-githubworkflowsdeployyml)
-   - [9.4 Sicurezza della Pipeline](#94-sicurezza-della-pipeline)
-   - [9.5 Segreti Pipeline](#95-segreti-pipeline)
+   - [9.4 Immagini Pubblicate su Docker Hub](#94-immagini-pubblicate-su-docker-hub)
+   - [9.5 Sicurezza della Pipeline](#95-sicurezza-della-pipeline)
+   - [9.6 Segreti Pipeline](#96-segreti-pipeline)
 10. [Kubernetes](#10-kubernetes)
     - [10.1 Architettura](#101-architettura)
     - [10.2 Setup microk8s](#102-setup-microk8s)
@@ -1180,7 +1190,7 @@ build → scan → push
 |-----|---------|---------|
 | `build` | 20 min | BuildKit multi-tag (versione release + `:latest`), salva `.tar` come artefatto GitHub |
 | `scan` | 20 min | Trivy SARIF + gate `--ignore-unfixed`; Docker Scout SARIF + gate `ignore-base: true` |
-| `push` | 10 min | `docker push --all-tags` su Docker Hub (`$DOCKERHUB_USERNAME/rentacar-backend`) |
+| `push` | 10 min | `docker push --all-tags` su Docker Hub ([`ben03030303/rentacar-backend`](https://hub.docker.com/r/ben03030303/rentacar-backend)) |
 
 ### 9.3 Workflow Deploy Frontend ([`.github/workflows/deploy.yml`](https://github.com/aaselli2-unisa/rent-a-car-frontend-project/blob/master/.github/workflows/deploy.yml))
 
@@ -1194,14 +1204,32 @@ build → scan → push
 |-----|---------|---------|
 | `build` | 20 min | BuildKit, tag versione + `:latest`, salva `.tar` come artefatto |
 | `scan` | 20 min | Trivy SARIF + gate `--ignore-unfixed`; Docker Scout SARIF + gate `ignore-base: true` |
-| `push` | 10 min | `docker push --all-tags` su Docker Hub (`$DOCKERHUB_USERNAME/rentacar-frontend`) |
+| `push` | 10 min | `docker push --all-tags` su Docker Hub ([`ben03030303/rentacar-frontend`](https://hub.docker.com/r/ben03030303/rentacar-frontend)) |
 
 **Differenze rispetto al backend:**
 - Nessun `.trivyignore`: i CVE trovati nel frontend erano tutti fixabili con `apk upgrade`, non richiedevano soppressione esplicita.
 - Docker Scout `ignore-base: true` esclude i CVE già presenti nei layer `nginx:1.27-alpine` e non attribuibili al codice del team.
 - Nessun job `snyk`, `semgrep`, `sonarcloud`: il frontend è TypeScript/React, i tool di analisi statica erano configurati solo per il backend Java.
 
-### 9.4 Sicurezza della Pipeline
+### 9.4 Immagini Pubblicate su Docker Hub
+
+Le immagini vengono pubblicate su [hub.docker.com/u/ben03030303](https://hub.docker.com/u/ben03030303) solo al superamento dei gate Trivy e Docker Scout (step `scan`). Non viene fatto un push automatico su commit o PR per assicurarci che le immagini rispecchino sempre uno stato validato dalla pipeline.
+
+| Immagine | Contenuto | Tag |
+|----------|-----------|-----|
+| [`ben03030303/rentacar-backend`](https://hub.docker.com/r/ben03030303/rentacar-backend) | JAR Spring Boot su `eclipse-temurin:17-jre`, utente non-root `appuser` (UID 10001) | versione release + `:latest` |
+| [`ben03030303/rentacar-frontend`](https://hub.docker.com/r/ben03030303/rentacar-frontend) | Bundle React statico su `nginx:1.27-alpine` | versione release + `:latest` |
+
+**Trigger:** pubblicazione di una release GitHub (`on: release: types: [published]`). Il workflow `deploy.yml` esegue la sequenza `build → scan → push`: il push avviene solo se entrambi i gate passano.
+
+```bash
+docker pull ben03030303/rentacar-backend:latest
+docker pull ben03030303/rentacar-frontend:latest
+```
+
+---
+
+### 9.5 Sicurezza della Pipeline
 
 Ogni workflow applica il principio del minimo privilegio: i permessi sono dichiarati globalmente come `contents: read` e i job che richiedono privilegi aggiuntivi (upload SARIF, push su Docker Hub) li dichiarano esplicitamente. Tutti i job hanno `timeout-minutes` espliciti per evitare che un job bloccato consumi minuti runner indefinitamente. I secret non compaiono mai nel codice sorgente: vengono letti dai GitHub Secrets e iniettati come variabili d'ambiente dal runner al momento dell'esecuzione.
 
@@ -1212,7 +1240,7 @@ Ogni workflow applica il principio del minimo privilegio: i permessi sono dichia
 | Build separato dal push | `build` non fa push; il push avviene solo dopo che `scan` conferma assenza di CVE critiche |
 | Nessun secret nel codice | Tutti i secret letti da GitHub Secrets/Variables al momento dell'esecuzione |
 
-### 9.5 Segreti Pipeline
+### 9.6 Segreti Pipeline
 
 | Nome | Tipo | Workflow | Utilizzo |
 |------|------|:--------:|---------|
